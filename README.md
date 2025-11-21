@@ -1,8 +1,19 @@
-# 🎣 GPO Autofish
+# 🎣 GPO Autofish - GUIDE
 
 ## What is this?
 
-An automated fishing macro for Grand Piece Online (Roblox). This tool uses screen capture to detect the fishing minigame and automatically controls the fishing bar using a PD (Proportional-Derivative) controller algorithm to catch fish. It can also automatically purchase bait after a set number of catches.
+This is the **open-source version** of the GPO fishing macro that everyone uses. Unlike the closed-source version that gets flagged as a virus and isn't trustworthy, this version is:
+
+- ✅ **Fully open source** - You can see and verify all the code
+- ✅ **No viruses** - Clean, transparent, and safe
+- ✅ **Improved** - Better features and reliability
+- ✅ **Community-driven** - Open for contributions and review
+
+The original closed-source macro is sketchy and often flagged by antivirus software because you can't verify what it's actually doing. This open-source version solves that problem.
+
+**🛡️ Concerned about safety? Read [IS_IT_A_VIRUS.md](IS_IT_A_VIRUS.md) for more information.**
+
+---
 
 **Features:**
 
