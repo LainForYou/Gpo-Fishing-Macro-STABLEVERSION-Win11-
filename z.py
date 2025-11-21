@@ -81,7 +81,6 @@ class HotkeyGUI:
         self.auto_purchase_var = tk.BooleanVar(value=True)
         auto_check = ttk.Checkbutton(main_frame, variable=self.auto_purchase_var, text='Enabled')
         auto_check.grid(row=6, column=1, columnspan=2, pady=5, sticky=tk.W)
-        ttk.Label(main_frame, text='Amount:').grid(row=7, column=0, sticky=tk.W, pady=5)
         self.amount_var = tk.IntVar(value=10)
         amount_spinbox = ttk.Spinbox(main_frame, from_=0, to=1000000, increment=1, textvariable=self.amount_var, width=10)
         amount_spinbox.grid(row=7, column=1, columnspan=2, pady=5, sticky=tk.W)
@@ -196,6 +195,22 @@ class HotkeyGUI:
         except Exception as e:
             print(f'Error clicking at {coords}: {e}')
 
+    def _right_click_at(self, coords):
+        """Move cursor to coords and perform a right click."""  # inserted
+        try:
+            x, y = (int(coords[0]), int(coords[1]))
+            win32api.SetCursorPos((x, y))
+            try:
+                win32api.mouse_event(win32con.MOUSEEVENTF_MOVE, 0, 1, 0, 0)
+                threading.Event().wait(0.05)
+                win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, 0)
+                threading.Event().wait(0.05)
+                win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTUP, 0, 0, 0, 0)
+            except Exception:
+                pass
+        except Exception as e:
+            print(f'Error right-clicking at {coords}: {e}')
+
     def perform_auto_purchase_sequence(self):
         """Perform the auto-purchase sequence using saved points and amount.
 
@@ -207,7 +222,7 @@ Sequence (per user spec):
 - click point1, wait
 - click point3, wait
 - click point2, wait
-- move to point4
+- right-click point4 to close menu
 """
         print('=== AUTO-PURCHASE SEQUENCE START ===')
         pts = self.point_coords
@@ -278,10 +293,9 @@ Sequence (per user spec):
         if not self.main_loop_active:
             return
         
-        # Move cursor to point 4 (final position, no click)
-        print(f'Moving cursor to Point 4: {pts[4]}')
-        x, y = (int(pts[4][0]), int(pts[4][1]))
-        win32api.SetCursorPos((x, y))
+        # Right-click point 4 to close menu
+        print(f'Right-clicking Point 4: {pts[4]}')
+        self._right_click_at(pts[4])
         threading.Event().wait(self.purchase_click_delay)
         
         print('=== AUTO-PURCHASE SEQUENCE COMPLETE ===')
@@ -298,9 +312,40 @@ Sequence (per user spec):
         listener.start()
 
     def on_key_press(self, key):
-        """Handle key press during rebinding"""  # inserted
-        if self.recording_hotkey is None:
-            pass  # postinserted
+        """Handle key press during rebinding"""
+        if self.recording_hotkey:
+            try:
+                if hasattr(key, 'char') and key.char:
+                    key_str = key.char.lower()
+                elif hasattr(key, 'name'):
+                    key_str = key.name.lower()
+                else:
+                    key_str = str(key).split('.')[-1].lower()
+                
+                self.hotkeys[self.recording_hotkey] = key_str
+                
+                # Update the label
+                if self.recording_hotkey == 'toggle_loop':
+                    self.loop_key_label.config(text=key_str.upper())
+                elif self.recording_hotkey == 'toggle_overlay':
+                    self.overlay_key_label.config(text=key_str.upper())
+                elif self.recording_hotkey == 'exit':
+                    self.exit_key_label.config(text=key_str.upper())
+                
+                self.recording_hotkey = None
+                self.loop_rebind_btn.config(state='normal')
+                self.overlay_rebind_btn.config(state='normal')
+                self.exit_rebind_btn.config(state='normal')
+                self.status_msg.config(text=f'Hotkey set to {key_str.upper()}', foreground='green')
+                self.register_hotkeys()
+                return False  # Stop the listener
+            except Exception as e:
+                self.status_msg.config(text=f'Error setting hotkey: {e}', foreground='red')
+                self.recording_hotkey = None
+                self.loop_rebind_btn.config(state='normal')
+                self.overlay_rebind_btn.config(state='normal')
+                self.exit_rebind_btn.config(state='normal')
+                return False
         return False
 
     def register_hotkeys(self):
@@ -378,6 +423,8 @@ Sequence (per user spec):
                 print('Running initial auto-purchase...')
                 self.perform_auto_purchase_sequence()
             self.cast_line()
+            cast_time = time.time()
+            detected = False
             last_detection_time = time.time()
             was_detecting = False
             print('Entering main detection loop...')
@@ -403,14 +450,24 @@ Sequence (per user spec):
                             break
                     if found_first:
                         break
+                if found_first:
+                    detected = True
                 if not found_first:
                     current_time = time.time()
+                    if not detected and current_time - cast_time > self.scan_timeout:
+                        print('Cast timeout, recasting...')
+                        self.cast_line()
+                        cast_time = time.time()
+                        threading.Event().wait(0.1)
+                        continue
                     if was_detecting:
                         print('Lost detection, waiting...')
                         threading.Event().wait(self.wait_after_loss)
                         was_detecting = False
                         self.check_and_purchase()
                         self.cast_line()
+                        detected = False
+                        cast_time = time.time()
                         last_detection_time = time.time()
                     threading.Event().wait(0.1)
                     continue
