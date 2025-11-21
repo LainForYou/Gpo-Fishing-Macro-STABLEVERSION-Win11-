@@ -40,7 +40,3 @@ An automated fishing macro for Grand Piece Online (Roblox). This tool uses scree
    - Run: `python z.py`
 
 ---
-
-## Discord
-
-Join the Discord server: https://discord.gg/vKVBbyfHTD
