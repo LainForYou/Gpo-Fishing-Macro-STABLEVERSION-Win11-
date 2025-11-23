@@ -265,14 +265,22 @@ class ThemeManager:
     
     def load_logo_for_theme(self, theme_key):
         """Load the logo for the theme - always use icon.webp"""
+        import sys
         try:
-            # Always use the main icon.webp file
-            logo_path = os.path.join("images", "icon.webp")
+            # Handle logo path for both development and PyInstaller bundle
+            if hasattr(sys, '_MEIPASS'):
+                # Running as PyInstaller bundle
+                logo_path = os.path.join(sys._MEIPASS, "images", "icon.webp")
+            else:
+                # Running as script
+                logo_path = os.path.join("images", "icon.webp")
             
             if os.path.exists(logo_path):
                 image = Image.open(logo_path)
                 image = image.resize((64, 64), Image.Resampling.LANCZOS)
                 return ImageTk.PhotoImage(image)
+            else:
+                print(f"Logo not found at: {logo_path}")
         except Exception as e:
             print(f"Could not load logo for theme {theme_key}: {e}")
         
