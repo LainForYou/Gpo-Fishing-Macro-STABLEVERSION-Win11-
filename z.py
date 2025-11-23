@@ -148,6 +148,13 @@ class HotkeyGUI:
         self.webhook_interval = 10  # Send webhook every X loops
         self.webhook_counter = 0  # Track loops for webhook
         
+        # Auto-update settings
+        self.auto_update_enabled = False
+        self.last_update_check = 0
+        self.update_check_interval = 3600  # Check every hour
+        self.current_version = "1.4.0"  # Current version
+        self.repo_url = "https://api.github.com/repos/arielldev/gpo-fishing/commits/main"
+        
         # Performance settings
         self.silent_mode = False  # Reduce console logging
         self.verbose_logging = False  # Detailed logging for debugging
@@ -218,6 +225,9 @@ class HotkeyGUI:
         # Setup system tray if available
         if TRAY_AVAILABLE:
             self.setup_system_tray()
+        
+        # Start auto-update loop if enabled
+        self.root.after(5000, self.start_auto_update_loop)  # Start after 5 seconds
     
     def create_scrollable_frame(self):
         """Create a modern scrollable frame using tkinter Canvas and Scrollbar"""
@@ -315,6 +325,11 @@ class HotkeyGUI:
         right_controls = ttk.Frame(control_panel)
         right_controls.grid(row=0, column=2, sticky='e')
         
+        # Auto-update toggle button
+        self.auto_update_btn = ttk.Button(right_controls, text='🔄 Auto Update: OFF', 
+                                         command=self.toggle_auto_update, style='TButton')
+        self.auto_update_btn.pack(side=tk.LEFT, padx=(0, 8))
+        
         if TRAY_AVAILABLE:
             ttk.Button(right_controls, text='📌 Tray', command=self.minimize_to_tray,
                       style='TButton').pack(side=tk.LEFT)
@@ -378,6 +393,7 @@ class HotkeyGUI:
                     try:
                         self.root.after(0, lambda: self.update_point_button(idx))
                         self.root.after(0, lambda: self.status_msg.config(text=f'Point {idx} set: ({x}, {y})', foreground='green'))
+                        self.root.after(0, lambda: self.auto_save_settings())  # Auto-save when point is set
                     except Exception:
                         pass
                     return False  # Stop listener after first click
@@ -1532,6 +1548,8 @@ Sequence (per user spec):
         help_btn = ttk.Button(frame, text='?', width=3)
         help_btn.grid(row=row, column=2, padx=(10, 0), pady=5)
         ToolTip(help_btn, "Automatically buy bait after catching fish. Requires setting Points 1-4.")
+        # Auto-save when auto-purchase is toggled
+        self.auto_purchase_var.trace_add('write', lambda *args: self.auto_save_settings())
         row += 1
         
         # Purchase Amount
@@ -1539,6 +1557,8 @@ Sequence (per user spec):
         self.amount_var = tk.IntVar(value=10)
         amount_spinbox = ttk.Spinbox(frame, from_=0, to=1000000, increment=1, textvariable=self.amount_var, width=10)
         amount_spinbox.grid(row=row, column=1, pady=5, sticky='w')
+        # Auto-save when amount changes
+        self.amount_var.trace_add('write', lambda *args: self.auto_save_settings())
         help_btn = ttk.Button(frame, text='?', width=3)
         help_btn.grid(row=row, column=2, padx=(10, 0), pady=5)
         ToolTip(help_btn, "How much bait to buy each time (e.g., 10 = buy 10 bait)")
@@ -1555,6 +1575,8 @@ Sequence (per user spec):
         help_btn.grid(row=row, column=2, padx=(10, 0), pady=5)
         ToolTip(help_btn, "Buy bait every X fish caught (e.g., 10 = buy bait after every 10 fish)")
         self.loops_var.trace_add('write', lambda *args: setattr(self, 'loops_per_purchase', self.loops_var.get()))
+        # Auto-save when loops per purchase changes
+        self.loops_var.trace_add('write', lambda *args: self.auto_save_settings())
         self.loops_per_purchase = self.loops_var.get()
         row += 1
         
@@ -1715,7 +1737,7 @@ Sequence (per user spec):
         help_btn = ttk.Button(frame, text='?', width=3)
         help_btn.grid(row=row, column=2, padx=(10, 0), pady=5)
         ToolTip(help_btn, "Send fishing progress updates to Discord")
-        self.webhook_enabled_var.trace_add('write', lambda *args: setattr(self, 'webhook_enabled', self.webhook_enabled_var.get()))
+        self.webhook_enabled_var.trace_add('write', lambda *args: (setattr(self, 'webhook_enabled', self.webhook_enabled_var.get()), self.auto_save_settings()))
         row += 1
         
         # Webhook URL
@@ -1726,7 +1748,7 @@ Sequence (per user spec):
         help_btn = ttk.Button(frame, text='?', width=3)
         help_btn.grid(row=row, column=2, padx=(10, 0), pady=5)
         ToolTip(help_btn, "Discord webhook URL from your server settings")
-        self.webhook_url_var.trace_add('write', lambda *args: setattr(self, 'webhook_url', self.webhook_url_var.get()))
+        self.webhook_url_var.trace_add('write', lambda *args: (setattr(self, 'webhook_url', self.webhook_url_var.get()), self.auto_save_settings()))
         row += 1
         
         # Webhook interval
@@ -1737,7 +1759,7 @@ Sequence (per user spec):
         help_btn = ttk.Button(frame, text='?', width=3)
         help_btn.grid(row=row, column=2, padx=(10, 0), pady=5)
         ToolTip(help_btn, "Send webhook message every X fish caught (e.g., 10 = message every 10 fish)")
-        self.webhook_interval_var.trace_add('write', lambda *args: setattr(self, 'webhook_interval', self.webhook_interval_var.get()))
+        self.webhook_interval_var.trace_add('write', lambda *args: (setattr(self, 'webhook_interval', self.webhook_interval_var.get()), self.auto_save_settings()))
         row += 1
         
         # Test webhook button
@@ -1836,6 +1858,226 @@ Sequence (per user spec):
             self.status_msg.config(text='Opened Discord invite', foreground='#0DA50DFF')
         except Exception as e:
             self.status_msg.config(text=f'Error opening Discord: {e}', foreground='red')
+
+    def toggle_auto_update(self):
+        """Toggle auto-update feature on/off"""
+        self.auto_update_enabled = not self.auto_update_enabled
+        
+        if self.auto_update_enabled:
+            self.auto_update_btn.config(text='🔄 Auto Update: ON')
+            self.status_msg.config(text='Auto-update enabled - checking for updates...', foreground='#58a6ff')
+            # Start update checking thread
+            import threading
+            threading.Thread(target=self.check_for_updates, daemon=True).start()
+        else:
+            self.auto_update_btn.config(text='🔄 Auto Update: OFF')
+            self.status_msg.config(text='Auto-update disabled', foreground='orange')
+        
+        # Auto-save the setting immediately
+        self.auto_save_settings()
+
+    def check_for_updates(self):
+        """Check for updates from GitHub repository"""
+        try:
+            import requests
+            import time
+            
+            current_time = time.time()
+            if current_time - self.last_update_check < self.update_check_interval:
+                return  # Don't check too frequently
+            
+            self.last_update_check = current_time
+            
+            # Get latest commit info from GitHub API
+            response = requests.get(self.repo_url, timeout=10)
+            if response.status_code == 200:
+                commit_data = response.json()
+                latest_commit = commit_data['sha'][:7]  # Short commit hash
+                commit_message = commit_data['commit']['message'].split('\n')[0]  # First line only
+                commit_date = commit_data['commit']['committer']['date']
+                
+                # Check if we have a newer commit (simple check)
+                if self.should_update(commit_date):
+                    self.root.after(0, lambda: self.prompt_update(latest_commit, commit_message))
+                else:
+                    self.root.after(0, lambda: self.status_msg.config(text='✅ Up to date!', foreground='green'))
+            else:
+                self.root.after(0, lambda: self.status_msg.config(text='❌ Update check failed', foreground='red'))
+                
+        except Exception as e:
+            self.root.after(0, lambda: self.status_msg.config(text=f'Update check error: {str(e)[:30]}...', foreground='red'))
+
+    def should_update(self, commit_date):
+        """Simple check if we should update based on commit date"""
+        try:
+            from datetime import datetime
+            import os
+            
+            # Get current file modification time
+            current_file_time = os.path.getmtime(__file__)
+            
+            # Parse GitHub commit date
+            commit_time = datetime.fromisoformat(commit_date.replace('Z', '+00:00')).timestamp()
+            
+            # Update if commit is newer than current file
+            return commit_time > current_file_time
+        except:
+            return False  # Don't update if we can't determine
+
+    def prompt_update(self, commit_hash, commit_message):
+        """Prompt user about available update"""
+        import tkinter.messagebox as msgbox
+        
+        message = f"New update available!\n\nLatest commit: {commit_hash}\nChanges: {commit_message}\n\nWould you like to download the update?"
+        
+        if msgbox.askyesno("Update Available", message):
+            self.download_update()
+        else:
+            self.status_msg.config(text='Update skipped', foreground='orange')
+
+    def download_update(self):
+        """Download and apply update automatically while preserving user settings"""
+        try:
+            import requests
+            import os
+            import sys
+            import shutil
+            import zipfile
+            import tempfile
+            from datetime import datetime
+            
+            self.status_msg.config(text='Downloading update...', foreground='#58a6ff')
+            
+            # Download the entire repository as ZIP
+            zip_url = "https://github.com/arielldev/gpo-fishing/archive/refs/heads/main.zip"
+            response = requests.get(zip_url, timeout=60)
+            
+            if response.status_code == 200:
+                # Create temporary directory for extraction
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    zip_path = os.path.join(temp_dir, "update.zip")
+                    
+                    # Save ZIP file
+                    with open(zip_path, 'wb') as f:
+                        f.write(response.content)
+                    
+                    # Extract ZIP
+                    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                        zip_ref.extractall(temp_dir)
+                    
+                    # Find extracted folder (usually repo-name-main)
+                    extracted_folder = None
+                    for item in os.listdir(temp_dir):
+                        if os.path.isdir(os.path.join(temp_dir, item)) and 'gpo-fishing' in item:
+                            extracted_folder = os.path.join(temp_dir, item)
+                            break
+                    
+                    if not extracted_folder:
+                        self.status_msg.config(text='❌ Update extraction failed', foreground='red')
+                        return
+                    
+                    # Files to preserve (user settings)
+                    preserve_files = [
+                        'default_settings.json',
+                        'presets/',
+                        '.git/',
+                        '.gitignore'
+                    ]
+                    
+                    # Create backup timestamp
+                    backup_timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                    current_dir = os.path.dirname(os.path.abspath(__file__))
+                    
+                    # Backup current installation
+                    backup_dir = os.path.join(current_dir, f"backup_{backup_timestamp}")
+                    os.makedirs(backup_dir, exist_ok=True)
+                    
+                    # Copy current files to backup
+                    for item in os.listdir(current_dir):
+                        if item.startswith('backup_'):
+                            continue
+                        src = os.path.join(current_dir, item)
+                        dst = os.path.join(backup_dir, item)
+                        try:
+                            if os.path.isdir(src):
+                                shutil.copytree(src, dst)
+                            else:
+                                shutil.copy2(src, dst)
+                        except:
+                            pass
+                    
+                    self.status_msg.config(text='Installing update...', foreground='#58a6ff')
+                    
+                    # Update files (except preserved ones)
+                    for item in os.listdir(extracted_folder):
+                        src = os.path.join(extracted_folder, item)
+                        dst = os.path.join(current_dir, item)
+                        
+                        # Skip preserved files/folders
+                        if any(item.startswith(preserve.rstrip('/')) for preserve in preserve_files):
+                            continue
+                        
+                        try:
+                            if os.path.exists(dst):
+                                if os.path.isdir(dst):
+                                    shutil.rmtree(dst)
+                                else:
+                                    os.remove(dst)
+                            
+                            if os.path.isdir(src):
+                                shutil.copytree(src, dst)
+                            else:
+                                shutil.copy2(src, dst)
+                        except Exception as e:
+                            print(f"Error updating {item}: {e}")
+                    
+                    self.status_msg.config(text='✅ Update installed! Restarting...', foreground='green')
+                    
+                    # Schedule restart after showing message
+                    self.root.after(2000, self.restart_application)
+                    
+            else:
+                self.status_msg.config(text='❌ Download failed', foreground='red')
+                
+        except Exception as e:
+            self.status_msg.config(text=f'Update error: {str(e)[:30]}...', foreground='red')
+
+    def restart_application(self):
+        """Restart the application after update"""
+        try:
+            import sys
+            import os
+            import subprocess
+            
+            # Get the current script path
+            script_path = os.path.abspath(__file__)
+            
+            # Close current application
+            self.root.quit()
+            self.root.destroy()
+            
+            # Start new instance
+            if getattr(sys, 'frozen', False):
+                # If running as exe
+                subprocess.Popen([sys.executable])
+            else:
+                # If running as Python script
+                subprocess.Popen([sys.executable, script_path])
+            
+            # Exit current process
+            sys.exit(0)
+            
+        except Exception as e:
+            print(f"Restart failed: {e}")
+            sys.exit(1)
+
+    def start_auto_update_loop(self):
+        """Start the auto-update checking loop"""
+        if self.auto_update_enabled:
+            import threading
+            threading.Thread(target=self.check_for_updates, daemon=True).start()
+            # Schedule next check
+            self.root.after(self.update_check_interval * 1000, self.start_auto_update_loop)
 
     def test_webhook(self):
         """Send a test webhook message"""
@@ -2125,8 +2367,8 @@ Sequence (per user spec):
             
         preset_data = {
             'auto_purchase_enabled': getattr(self.auto_purchase_var, 'get', lambda: False)(),
-            'auto_purchase_amount': getattr(self, 'auto_purchase_amount', 100),
-            'loops_per_purchase': getattr(self, 'loops_per_purchase', 1),
+            'auto_purchase_amount': getattr(self.amount_var, 'get', lambda: getattr(self, 'auto_purchase_amount', 100))(),
+            'loops_per_purchase': getattr(self.loops_var, 'get', lambda: getattr(self, 'loops_per_purchase', 1))(),
             'point_coords': getattr(self, 'point_coords', {}),
             'kp': getattr(self, 'kp', 0.1),
             'kd': getattr(self, 'kd', 0.5),
@@ -2136,6 +2378,7 @@ Sequence (per user spec):
             'webhook_url': getattr(self, 'webhook_url', ''),
             'webhook_enabled': getattr(self, 'webhook_enabled', False),
             'webhook_interval': getattr(self, 'webhook_interval', 10),
+            'auto_update_enabled': getattr(self, 'auto_update_enabled', False),
             'dark_theme': getattr(self, 'dark_theme', True),
             'last_saved': datetime.now().isoformat()
         }
@@ -2162,6 +2405,12 @@ Sequence (per user spec):
                 self.auto_purchase_var.set(preset_data.get('auto_purchase_enabled', False))
             self.auto_purchase_amount = preset_data.get('auto_purchase_amount', 100)
             self.loops_per_purchase = preset_data.get('loops_per_purchase', 1)
+            
+            # Update spinbox variables if they exist
+            if hasattr(self, 'amount_var'):
+                self.amount_var.set(self.auto_purchase_amount)
+            if hasattr(self, 'loops_var'):
+                self.loops_var.set(self.loops_per_purchase)
             self.point_coords = preset_data.get('point_coords', {})
             self.kp = preset_data.get('kp', 0.1)
             self.kd = preset_data.get('kd', 0.5)
@@ -2171,11 +2420,14 @@ Sequence (per user spec):
             self.webhook_url = preset_data.get('webhook_url', '')
             self.webhook_enabled = preset_data.get('webhook_enabled', False)
             self.webhook_interval = preset_data.get('webhook_interval', 10)
+            self.auto_update_enabled = preset_data.get('auto_update_enabled', False)
             self.dark_theme = preset_data.get('dark_theme', True)
             
             # Update UI elements if they exist
             if hasattr(self, 'point_buttons'):
                 self.update_point_buttons()
+            if hasattr(self, 'auto_update_btn'):
+                self.update_auto_update_button()
             
         except Exception as e:
             print(f'Error loading default settings: {e}')
@@ -2195,6 +2447,16 @@ Sequence (per user spec):
             self.tray_key_label.config(text=self.hotkeys['toggle_tray'].upper())
         except AttributeError:
             pass  # Labels not created yet
+
+    def update_auto_update_button(self):
+        """Update auto-update button text based on current state"""
+        try:
+            if self.auto_update_enabled:
+                self.auto_update_btn.config(text='🔄 Auto Update: ON')
+            else:
+                self.auto_update_btn.config(text='🔄 Auto Update: OFF')
+        except AttributeError:
+            pass  # Button not created yet
 
     def setup_system_tray(self):
         """Setup system tray functionality"""
