@@ -258,12 +258,16 @@ class FishingBot:
     def perform_auto_purchase(self):
         """Perform auto-purchase sequence"""
         pts = self.app.point_coords
+        
+        # Convert points to tuples if they're lists (from JSON)
+        for key in [1, 2, 3, 4]:
+            if key in pts and pts[key] and isinstance(pts[key], list):
+                pts[key] = tuple(pts[key])
+        
         if not pts or not pts.get(1) or not pts.get(2) or not pts.get(3) or not pts.get(4):
-            print('Auto purchase aborted: points not fully set (need points 1-4).')
             return
         
         if not self.app.main_loop_active:
-            print('Auto purchase aborted: main loop stopped.')
             return
         
         amount = str(self.app.auto_purchase_amount)
@@ -328,24 +332,28 @@ class FishingBot:
         try:
             x, y = (int(coords[0]), int(coords[1]))
             win32api.SetCursorPos((x, y))
-            time.sleep(0.05)
+            win32api.mouse_event(win32con.MOUSEEVENTF_MOVE, 0, 1, 0, 0)
+            threading.Event().wait(0.05)
             win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
-            time.sleep(0.05)
+            threading.Event().wait(0.05)
             win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
         except Exception as e:
-            print(f'Error clicking at {coords}: {e}')
+            pass
     
     def _right_click_at(self, coords):
         """Right click at coordinates"""
         try:
             x, y = (int(coords[0]), int(coords[1]))
             win32api.SetCursorPos((x, y))
-            time.sleep(0.05)
+            win32api.mouse_event(win32con.MOUSEEVENTF_MOVE, 0, 1, 0, 0)
+            threading.Event().wait(0.05)
             win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, 0)
-            time.sleep(0.05)
+            threading.Event().wait(0.05)
             win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTUP, 0, 0, 0, 0)
         except Exception as e:
-            print(f'Error right-clicking at {coords}: {e}')
+            pass
+        except Exception as e:
+            pass
     
     def run_main_loop(self):
         """Main fishing loop with aggressive monitoring"""
