@@ -254,14 +254,22 @@ class HotkeyGUI:
         if TRAY_AVAILABLE:
             self.setup_system_tray()
         
-        # Initialize UpdateManager after GUI is ready
-        from updater import UpdateManager
-        self.update_manager = UpdateManager(self)
-        
-        # Check for updates immediately on startup if enabled, then start regular loop
-        if self.auto_update_enabled:
-            self.root.after(2000, self.update_manager.startup_update_check)
-        self.root.after(5000, self.update_manager.start_auto_update_loop)
+        # Initialize UpdateManager after GUI is ready with error handling
+        try:
+            from updater import UpdateManager
+            self.update_manager = UpdateManager(self)
+            print("✅ UpdateManager initialized successfully")
+            
+            # Check for updates immediately on startup if enabled, then start regular loop
+            if self.auto_update_enabled:
+                self.root.after(2000, lambda: self._safe_startup_update_check())
+            self.root.after(5000, lambda: self._safe_start_update_loop())
+            
+        except Exception as e:
+            print(f"❌ Failed to initialize UpdateManager: {e}")
+            self.update_manager = None
+            self.auto_update_enabled = False
+            self.auto_update_btn.config(text='🔄 Auto Update: ERROR')
     
     def create_scrollable_frame(self):
         """Create a modern scrollable frame using tkinter Canvas and Scrollbar"""
@@ -716,7 +724,11 @@ Sequence (per user spec):
         
         # Clear any pending updates since we're starting fishing again
         if self.update_manager:
-            self.update_manager.pending_update = None
+            try:
+                self.update_manager.pending_update = None
+                print("🎣 Cleared pending updates - fishing started")
+            except Exception as e:
+                print(f"❌ Error clearing pending updates: {e}")
         
         # Update UI
         self.loop_status.config(text='● Main Loop: ACTIVE', style='StatusOn.TLabel')
@@ -748,12 +760,16 @@ Sequence (per user spec):
         # Update UI
         self.loop_status.config(text='● Main Loop: PAUSED', style='StatusOff.TLabel')
         
-        # Check for pending updates using UpdateManager
+        # Check for pending updates using UpdateManager with error handling
         if self.auto_update_enabled and self.update_manager:
-            self.update_manager.show_pending_update()
-            # Also check for new updates when fishing stops
-            import threading
-            threading.Thread(target=self.update_manager.check_for_updates, daemon=True).start()
+            try:
+                self.update_manager.show_pending_update()
+                # Also check for new updates when fishing stops
+                import threading
+                threading.Thread(target=self.update_manager.check_for_updates, daemon=True).start()
+            except Exception as e:
+                print(f"❌ Error checking for updates after pause: {e}")
+                self.update_status('Update check failed', 'error', '❌')
         
         self.log('⏸️ Fishing paused', "important")
     
@@ -1463,22 +1479,48 @@ Sequence (per user spec):
         except Exception as e:
             self.status_msg.config(text=f'Error opening Discord: {e}', foreground='red')
 
+    def _safe_startup_update_check(self):
+        """Safely run startup update check with error handling"""
+        try:
+            if self.update_manager:
+                self.update_manager.startup_update_check()
+        except Exception as e:
+            print(f"❌ Startup update check failed: {e}")
+            self.update_status('Update check failed', 'error', '❌')
+
+    def _safe_start_update_loop(self):
+        """Safely start update loop with error handling"""
+        try:
+            if self.update_manager:
+                self.update_manager.start_auto_update_loop()
+        except Exception as e:
+            print(f"❌ Auto-update loop failed: {e}")
+            self.update_status('Auto-update loop failed', 'error', '❌')
+
     def toggle_auto_update(self):
-        """Toggle auto-update feature on/off"""
+        """Toggle auto-update feature on/off with proper error handling"""
+        if not self.update_manager:
+            self.update_status('UpdateManager not available', 'error', '❌')
+            return
+            
         self.auto_update_enabled = not self.auto_update_enabled
         
         if self.auto_update_enabled:
             self.auto_update_btn.config(text='🔄 Auto Update: ON')
             if self.main_loop_active:
-                self.status_msg.config(text='Auto-update enabled (will check when fishing stops)', foreground='#58a6ff')
+                self.update_status('Auto-update enabled (will check when fishing stops)', 'info', '🔄')
             else:
-                self.status_msg.config(text='Auto-update enabled - checking for updates...', foreground='#58a6ff')
-                # Start update checking thread only if main loop is not active
-                import threading
-                threading.Thread(target=self.check_for_updates, daemon=True).start()
+                self.update_status('Auto-update enabled - checking for updates...', 'info', '🔄')
+                # Use UpdateManager for checking with error handling
+                try:
+                    import threading
+                    threading.Thread(target=self.update_manager.check_for_updates, daemon=True).start()
+                except Exception as e:
+                    print(f"❌ Error starting update check: {e}")
+                    self.update_status('Update check failed', 'error', '❌')
         else:
             self.auto_update_btn.config(text='🔄 Auto Update: OFF')
-            self.status_msg.config(text='Auto-update disabled', foreground='orange')
+            self.update_status('Auto-update disabled', 'warning', '📴')
         
         # Auto-save the setting immediately
         self.auto_save_settings()
