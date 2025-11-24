@@ -163,13 +163,9 @@ class HotkeyGUI:
         self.webhook_interval = 10  # Send webhook every X loops
         self.webhook_counter = 0  # Track loops for webhook
         
-        # Auto-update settings
+        # Auto-update settings - now using UpdateManager
         self.auto_update_enabled = False
-        self.last_update_check = 0
-        self.update_check_interval = 300  # Check every 5min
-        self.pending_update = None  # Store update info when main loop is active
-        self.current_version = "1.5"  # Current version
-        self.repo_url = "https://api.github.com/repos/arielldev/gpo-fishing/commits/main"
+        self.update_manager = None  # Will be initialized after GUI is ready
         
         # Performance settings
         self.silent_mode = False  # Reduce console logging
@@ -258,10 +254,14 @@ class HotkeyGUI:
         if TRAY_AVAILABLE:
             self.setup_system_tray()
         
+        # Initialize UpdateManager after GUI is ready
+        from updater import UpdateManager
+        self.update_manager = UpdateManager(self)
+        
         # Check for updates immediately on startup if enabled, then start regular loop
         if self.auto_update_enabled:
-            self.root.after(2000, self.startup_update_check)  # Check after 2 seconds for startup
-        self.root.after(5000, self.start_auto_update_loop)  # Start regular loop after 5 seconds
+            self.root.after(2000, self.update_manager.startup_update_check)
+        self.root.after(5000, self.update_manager.start_auto_update_loop)
     
     def create_scrollable_frame(self):
         """Create a modern scrollable frame using tkinter Canvas and Scrollbar"""
@@ -715,8 +715,8 @@ Sequence (per user spec):
         self.reset_fish_counter()
         
         # Clear any pending updates since we're starting fishing again
-        if self.pending_update:
-            self.pending_update = None
+        if self.update_manager:
+            self.update_manager.pending_update = None
         
         # Update UI
         self.loop_status.config(text='● Main Loop: ACTIVE', style='StatusOn.TLabel')
@@ -748,13 +748,12 @@ Sequence (per user spec):
         # Update UI
         self.loop_status.config(text='● Main Loop: PAUSED', style='StatusOff.TLabel')
         
-        # Check for pending updates first, then check for new updates
-        if self.pending_update:
-            # Show the pending update dialog now that fishing stopped
-            self.root.after(1000, lambda: self.show_pending_update())  # Small delay to let UI settle
-        elif self.auto_update_enabled:
+        # Check for pending updates using UpdateManager
+        if self.auto_update_enabled and self.update_manager:
+            self.update_manager.show_pending_update()
+            # Also check for new updates when fishing stops
             import threading
-            threading.Thread(target=self.check_for_updates, daemon=True).start()
+            threading.Thread(target=self.update_manager.check_for_updates, daemon=True).start()
         
         self.log('⏸️ Fishing paused', "important")
     
@@ -1484,135 +1483,7 @@ Sequence (per user spec):
         # Auto-save the setting immediately
         self.auto_save_settings()
 
-    def check_for_updates(self):
-        """Check for updates from GitHub repository"""
-        # Don't check for updates while main loop is running
-        if self.main_loop_active:
-            return
-            
-        try:
-            import requests
-            import time
-            
-            current_time = time.time()
-            if current_time - self.last_update_check < self.update_check_interval:
-                return  # Don't check too frequently
-            
-            self.last_update_check = current_time
-            
-            # Get latest commit info from GitHub API
-            response = requests.get(self.repo_url, timeout=10)
-            if response.status_code == 200:
-                commit_data = response.json()
-                latest_commit = commit_data['sha'][:7]  # Short commit hash
-                commit_message = commit_data['commit']['message'].split('\n')[0]  # First line only
-                commit_date = commit_data['commit']['committer']['date']
-                
-                # Check if we have a newer commit (simple check)
-                if self.should_update(commit_date):
-                    self.root.after(0, lambda: self.prompt_update(latest_commit, commit_message))
-                else:
-                    self.root.after(0, lambda: self.status_msg.config(text='✅ Up to date!', foreground='green'))
-            else:
-                self.root.after(0, lambda: self.status_msg.config(text='❌ Update check failed', foreground='red'))
-                
-        except Exception as e:
-            self.root.after(0, lambda: self.status_msg.config(text=f'Update check error: {str(e)[:30]}...', foreground='red'))
-
-    def should_update(self, commit_date):
-        """Simple check if we should update based on commit date"""
-        try:
-            from datetime import datetime
-            import os
-            
-            # Get current file modification time
-            current_file_time = os.path.getmtime(__file__)
-            
-            # Parse GitHub commit date
-            commit_time = datetime.fromisoformat(commit_date.replace('Z', '+00:00')).timestamp()
-            
-            # Update if commit is newer than current file
-            return commit_time > current_file_time
-        except:
-            return False  # Don't update if we can't determine
-
-    def prompt_update(self, commit_hash, commit_message):
-        """Prompt user about available update"""
-        # Don't show update dialog while main loop is running
-        if self.main_loop_active:
-            # Store update info to show later when fishing stops
-            self.pending_update = {
-                'commit_hash': commit_hash,
-                'commit_message': commit_message
-            }
-            self.status_msg.config(text='Update available - will prompt when fishing stops', foreground='#58a6ff')
-            return
-        
-        import tkinter.messagebox as msgbox
-        
-        message = f"New update available!\n\nLatest commit: {commit_hash}\nChanges: {commit_message}\n\nWould you like to download the update?"
-        
-        if msgbox.askyesno("Update Available", message):
-            self.download_update()
-        else:
-            self.status_msg.config(text='Update skipped', foreground='orange')
-
-    def show_pending_update(self):
-        """Show the pending update dialog that was delayed during fishing"""
-        if not self.pending_update:
-            return
-            
-        import tkinter.messagebox as msgbox
-        
-        commit_hash = self.pending_update['commit_hash']
-        commit_message = self.pending_update['commit_message']
-        
-        message = f"Update available (found while fishing)!\n\nLatest commit: {commit_hash}\nChanges: {commit_message}\n\nWould you like to download the update?"
-        
-        if msgbox.askyesno("Update Available", message):
-            self.download_update()
-        else:
-            self.status_msg.config(text='Update skipped', foreground='orange')
-        
-        # Clear the pending update
-        self.pending_update = None
-
-    def startup_update_check(self):
-        """Check for updates immediately on startup (bypasses interval check)"""
-        if not self.auto_update_enabled or self.main_loop_active:
-            return
-            
-        # Run immediate update check in background thread
-        import threading
-        threading.Thread(target=self.immediate_update_check, daemon=True).start()
-
-    def immediate_update_check(self):
-        """Perform update check without interval restrictions"""
-        try:
-            import requests
-            import time
-            
-            # Update last check time
-            self.last_update_check = time.time()
-            
-            # Get latest commit info from GitHub API
-            response = requests.get(self.repo_url, timeout=10)
-            if response.status_code == 200:
-                commit_data = response.json()
-                latest_commit = commit_data['sha'][:7]  # Short commit hash
-                commit_message = commit_data['commit']['message'].split('\n')[0]  # First line only
-                commit_date = commit_data['commit']['committer']['date']
-                
-                # Check if we have a newer commit (simple check)
-                if self.should_update(commit_date):
-                    self.root.after(0, lambda: self.prompt_update(latest_commit, commit_message))
-                else:
-                    self.root.after(0, lambda: self.status_msg.config(text='✅ Up to date!', foreground='green'))
-            else:
-                self.root.after(0, lambda: self.status_msg.config(text='❌ Update check failed', foreground='red'))
-                
-        except Exception as e:
-            self.root.after(0, lambda: self.status_msg.config(text=f'Update check error: {str(e)[:30]}...', foreground='red'))
+    # Update methods removed - now using UpdateManager class from updater.py
 
     def download_update(self):
         """Download and apply update automatically while preserving user settings"""
@@ -1751,14 +1622,22 @@ Sequence (per user spec):
             sys.exit(1)
 
     def start_auto_update_loop(self):
-        """Start the auto-update checking loop"""
-        if self.auto_update_enabled and not self.main_loop_active:
-            import threading
-            threading.Thread(target=self.check_for_updates, daemon=True).start()
+        """Start the auto-update checking loop using UpdateManager"""
+        # UpdateManager handles its own scheduling, so we don't need to do anything here
+        pass
+    
+    def update_status(self, message, status_type='info', icon=''):
+        """Update status message from UpdateManager"""
+        color_map = {
+            'success': 'green',
+            'error': 'red',
+            'warning': 'orange',
+            'info': '#58a6ff'
+        }
+        color = color_map.get(status_type, '#58a6ff')
         
-        # Schedule next check regardless (but it will skip if main loop is active)
-        if self.auto_update_enabled:
-            self.root.after(self.update_check_interval * 1000, self.start_auto_update_loop)
+        full_message = f'{icon} {message}' if icon else message
+        self.status_msg.config(text=full_message, foreground=color)
 
     def test_webhook(self):
         """Send a test webhook message"""
