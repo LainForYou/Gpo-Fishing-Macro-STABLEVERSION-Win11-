@@ -1,80 +1,38 @@
 import os
 import sys
 import time
+import json
 import threading
 import tkinter.messagebox as msgbox
 
 class UpdateManager:
     def __init__(self, app):
         self.app = app
-        self.current_version = "1.5"
         self.repo_url = "https://api.github.com/repos/arielldev/gpo-fishing/commits/main"
+        self.version_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'installed_version.json')
         self.last_check = 0
         self.check_interval = 300  # 5 minutes
         self.pending_update = None
-        self.installed_commit = self._get_installed_commit()  # Track what's actually installed
         
-    def check_for_updates(self):
-        """Check for updates from GitHub repository"""
-        # Don't check for updates while main loop is running
-        if self.app.main_loop_active:
-            return
-        
-        try:
-            import requests
-            
-            current_time = time.time()
-            if current_time - self.last_check < self.check_interval:
-                return  # Don't check too frequently
-            
-            self.last_check = current_time
-            
-            response = requests.get(self.repo_url, timeout=10)
-            if response.status_code == 200:
-                commit_data = response.json()
-                commit_hash = commit_data['sha'][:7]
-                commit_message = commit_data['commit']['message'].split('\n')[0]
-                
-                if self.should_update(commit_hash):
-                    self.app.root.after(0, lambda: self.prompt_update(commit_hash, commit_message))
-                else:
-                    self.app.root.after(0, lambda: self.app.update_status('Up to date!', 'success', '✅'))
-            else:
-                self.app.root.after(0, lambda: self.app.update_status('Update check failed', 'error', '❌'))
-                
-        except Exception as e:
-            self.app.root.after(0, lambda: self.app.update_status(f'Update check error: {str(e)[:30]}...', 'error', '❌'))
+        # Initialize version tracking - this is the key to stopping nagging
+        self.installed_commit = self._load_installed_version()
+        if not self.installed_commit:
+            self._mark_current_as_installed()
 
-    def _get_installed_commit(self):
-        """Get the currently installed commit hash"""
+    def _load_installed_version(self):
+        """Load the currently installed commit hash from JSON file"""
         try:
-            import json
-            # Try to read from installed_version.json in project root
-            version_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'installed_version.json')
-            if os.path.exists(version_file):
-                with open(version_file, 'r') as f:
+            if os.path.exists(self.version_file):
+                with open(self.version_file, 'r') as f:
                     data = json.load(f)
                     return data.get('commit_hash')
-            else:
-                # File doesn't exist - automatically create it with current latest commit
-                print("🔄 First run detected - marking current version as installed...")
-                if self._auto_create_installed_version():
-                    # Try reading again after creation
-                    with open(version_file, 'r') as f:
-                        data = json.load(f)
-                        return data.get('commit_hash')
         except Exception as e:
-            print(f"Error reading installed version: {e}")
-        return None  # Unknown version
-    
-    def _save_installed_commit_data(self, commit_data):
-        """Save the complete commit data when user actually updates"""
+            print(f"Error loading installed version: {e}")
+        return None
+
+    def _save_installed_version(self, commit_data):
+        """Save commit data to JSON file - this prevents future nagging"""
         try:
-            import json
-            # Save in the project root directory
-            version_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'installed_version.json')
-            
-            # Save complete commit info
             save_data = {
                 'commit_hash': commit_data['sha'][:7],
                 'full_hash': commit_data['sha'],
@@ -83,120 +41,140 @@ class UpdateManager:
                 'updated_at': time.time()
             }
             
-            with open(version_file, 'w') as f:
+            with open(self.version_file, 'w') as f:
                 json.dump(save_data, f, indent=2)
             
             self.installed_commit = save_data['commit_hash']
-            print(f"✅ Saved installed version: {save_data['commit_hash']} - {save_data['message']}")
+            print(f"✅ Marked version as installed: {save_data['commit_hash']} - {save_data['message']}")
             
         except Exception as e:
             print(f"Error saving installed version: {e}")
 
-    def mark_current_as_installed(self):
-        """Mark the current latest commit as installed (stops nagging)"""
+    def _mark_current_as_installed(self):
+        """Mark the current latest commit as installed (stops all nagging)"""
         try:
             import requests
-            import json
-            
             response = requests.get(self.repo_url, timeout=10)
             if response.status_code == 200:
                 commit_data = response.json()
-                self._save_installed_commit_data(commit_data)
+                self._save_installed_version(commit_data)
+                print("🔄 First run - marked current version as installed")
                 return True
         except Exception as e:
-            print(f"Error marking current version as installed: {e}")
+            print(f"Error marking current as installed: {e}")
         return False
 
-    def _auto_create_installed_version(self):
-        """Automatically create installed_version.json on first run"""
+    def _is_new_version_available(self):
+        """Check if there's actually a new version - the core anti-nagging logic"""
         try:
             import requests
-            import json
-            
             response = requests.get(self.repo_url, timeout=10)
             if response.status_code == 200:
                 commit_data = response.json()
-                self._save_installed_commit_data(commit_data)
-                print("✅ Automatically marked current version as installed!")
-                return True
+                latest_hash = commit_data['sha'][:7]
+                
+                # Only return True if it's genuinely different from what we have installed
+                if self.installed_commit and latest_hash != self.installed_commit:
+                    return commit_data
+                    
         except Exception as e:
-            print(f"Error auto-creating installed version: {e}")
-        return False
+            print(f"Error checking for updates: {e}")
+        return None
 
-    def should_update(self, commit_hash):
-        """Check if we should update - only if it's a different commit than installed"""
-        # If we don't know what's installed, don't spam with updates
-        if not self.installed_commit:
-            return False
-        
-        # Only update if it's actually a different commit
-        return commit_hash != self.installed_commit
-
-    def prompt_update(self, commit_hash, commit_message):
-        """Prompt user about available update"""
-        # Don't show update dialog while main loop is running
+    def check_for_updates(self):
+        """Main update check - only prompts if there's actually something new"""
         if self.app.main_loop_active:
-            # Store the update info to show later
-            self.pending_update = {'commit_hash': commit_hash, 'commit_message': commit_message}
+            return
+        
+        current_time = time.time()
+        if current_time - self.last_check < self.check_interval:
+            return
+        
+        self.last_check = current_time
+        
+        new_commit = self._is_new_version_available()
+        if new_commit:
+            commit_hash = new_commit['sha'][:7]
+            commit_message = new_commit['commit']['message'].split('\n')[0]
+            self.app.root.after(0, lambda: self._prompt_update(commit_hash, commit_message, new_commit))
+        else:
+            self.app.root.after(0, lambda: self.app.update_status('Up to date!', 'success', '✅'))
+
+    def _prompt_update(self, commit_hash, commit_message, commit_data):
+        """Prompt user for update - includes option to skip and never ask again"""
+        if self.app.main_loop_active:
+            self.pending_update = {'hash': commit_hash, 'message': commit_message, 'data': commit_data}
             self.app.update_status('Update available - will prompt when fishing stops', 'info', '🔄')
             return
         
-        message = f"New update available!\\n\\nLatest commit: {commit_hash}\\nChanges: {commit_message}\\n\\nWould you like to download the update?"
+        message = f"New update available!\\n\\nCommit: {commit_hash}\\nChanges: {commit_message}\\n\\nChoose an option:"
         
-        if msgbox.askyesno("Update Available", message):
-            self.download_update()
-        else:
+        # Custom dialog with three options
+        result = self._show_update_dialog(message, commit_hash, commit_message)
+        
+        if result == "update":
+            self._download_and_install_update(commit_data)
+        elif result == "skip_forever":
+            # Mark this version as installed even though we didn't update
+            # This stops all future nagging about this specific version
+            self._save_installed_version(commit_data)
+            self.app.update_status('Update skipped - won\'t ask again for this version', 'info', '⏭️')
+        else:  # skip_once
             self.app.update_status('Update skipped', 'warning', '⏭️')
 
-    def show_pending_update(self):
-        """Show the pending update dialog that was delayed during fishing"""
-        if not self.pending_update:
-            return
-            
-        commit_hash = self.pending_update['commit_hash']
-        commit_message = self.pending_update['commit_message']
+    def _show_update_dialog(self, message, commit_hash, commit_message):
+        """Show custom update dialog with three options"""
+        import tkinter as tk
+        from tkinter import ttk
         
-        message = f"Update available (found while fishing)!\\n\\nLatest commit: {commit_hash}\\nChanges: {commit_message}\\n\\nWould you like to download the update?"
+        result = {"choice": "skip_once"}
         
-        if msgbox.askyesno("Update Available", message):
-            self.download_update()
-        else:
-            self.app.update_status('Update skipped', 'warning', '⏭️')
+        dialog = tk.Toplevel(self.app.root)
+        dialog.title("Update Available")
+        dialog.geometry("400x200")
+        dialog.resizable(False, False)
+        dialog.transient(self.app.root)
+        dialog.grab_set()
         
-        self.pending_update = None
+        # Center the dialog
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (dialog.winfo_width() // 2)
+        y = (dialog.winfo_screenheight() // 2) - (dialog.winfo_height() // 2)
+        dialog.geometry(f"+{x}+{y}")
+        
+        # Message
+        msg_frame = ttk.Frame(dialog)
+        msg_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        ttk.Label(msg_frame, text=f"New update available!", font=("Arial", 12, "bold")).pack()
+        ttk.Label(msg_frame, text=f"Commit: {commit_hash}").pack(pady=(10,0))
+        ttk.Label(msg_frame, text=f"Changes: {commit_message}", wraplength=350).pack(pady=(5,0))
+        
+        # Buttons
+        btn_frame = ttk.Frame(dialog)
+        btn_frame.pack(fill="x", padx=20, pady=(0,20))
+        
+        def on_update():
+            result["choice"] = "update"
+            dialog.destroy()
+        
+        def on_skip_forever():
+            result["choice"] = "skip_forever"
+            dialog.destroy()
+        
+        def on_skip_once():
+            result["choice"] = "skip_once"
+            dialog.destroy()
+        
+        ttk.Button(btn_frame, text="Update Now", command=on_update).pack(side="left", padx=(0,5))
+        ttk.Button(btn_frame, text="Skip Forever", command=on_skip_forever).pack(side="left", padx=5)
+        ttk.Button(btn_frame, text="Skip Once", command=on_skip_once).pack(side="left", padx=(5,0))
+        
+        dialog.wait_window()
+        return result["choice"]
 
-    def startup_update_check(self):
-        """Check for updates immediately on startup (bypasses interval check)"""
-        if not hasattr(self.app, 'auto_update_enabled') or not self.app.auto_update_enabled or self.app.main_loop_active:
-            return
-            
-        # Reset the last check time to force immediate check
-        self.last_check = 0
-        threading.Thread(target=self.immediate_update_check, daemon=True).start()
-
-    def immediate_update_check(self):
-        """Perform update check without interval restrictions"""
-        try:
-            import requests
-            
-            response = requests.get(self.repo_url, timeout=10)
-            if response.status_code == 200:
-                commit_data = response.json()
-                commit_hash = commit_data['sha'][:7]
-                commit_message = commit_data['commit']['message'].split('\n')[0]
-                
-                if self.should_update(commit_hash):
-                    self.app.root.after(0, lambda: self.prompt_update(commit_hash, commit_message))
-                else:
-                    self.app.root.after(0, lambda: self.app.update_status('Up to date!', 'success', '✅'))
-            else:
-                self.app.root.after(0, lambda: self.app.update_status('Update check failed', 'error', '❌'))
-                
-        except Exception as e:
-            self.app.root.after(0, lambda: self.app.update_status(f'Update check error: {str(e)[:30]}...', 'error', '❌'))
-
-    def download_update(self):
-        """Download and apply update automatically while preserving user settings"""
+    def _download_and_install_update(self, commit_data):
+        """Download and install the update"""
         try:
             import requests
             import zipfile
@@ -206,160 +184,135 @@ class UpdateManager:
             
             self.app.update_status('Downloading update...', 'info', '⬇️')
             
-            # First, get the latest commit info to save after successful update
-            commit_response = requests.get(self.repo_url, timeout=10)
-            latest_commit_data = None
-            if commit_response.status_code == 200:
-                latest_commit_data = commit_response.json()
-            
-            # Download the latest version
+            # Download the zip
             zip_url = "https://github.com/arielldev/gpo-fishing/archive/refs/heads/main.zip"
             response = requests.get(zip_url, timeout=60)
             
-            if response.status_code == 200:
-                # Create temporary directory for extraction
-                with tempfile.TemporaryDirectory() as temp_dir:
-                    zip_path = os.path.join(temp_dir, "update.zip")
-                    
-                    # Save the zip file
-                    with open(zip_path, 'wb') as f:
-                        f.write(response.content)
-                    
-                    # Extract the zip file
-                    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                        zip_ref.extractall(temp_dir)
-                    
-                    # Find the extracted folder
-                    extracted_folder = None
-                    for item in os.listdir(temp_dir):
-                        if os.path.isdir(os.path.join(temp_dir, item)) and 'gpo-fishing' in item:
-                            extracted_folder = os.path.join(temp_dir, item)
-                            break
-                    
-                    if not extracted_folder:
-                        self.app.update_status('Update extraction failed', 'error', '❌')
-                        return
-                    
-                    # Files to preserve during update
-                    preserve_files = ['default_settings.json', 'presets/', '.git/', '.gitignore', 'installed_version.json']
-                    
-                    # Create backup of current version
-                    backup_timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                    # Get the project root directory (parent of src)
-                    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                    backup_dir = os.path.join(project_root, f"backup_{backup_timestamp}")
-                    os.makedirs(backup_dir, exist_ok=True)
-                    
-                    # Backup current files
-                    for item in os.listdir(project_root):
-                        if item.startswith('backup_'):
-                            continue
-                        src = os.path.join(project_root, item)
-                        dst = os.path.join(backup_dir, item)
-                        try:
-                            if os.path.isdir(src):
-                                shutil.copytree(src, dst)
-                            else:
-                                shutil.copy2(src, dst)
-                        except:
-                            pass
-                    
-                    self.app.update_status('Installing update...', 'info', '⚙️')
-                    
-                    # Check if requirements.txt will be updated
-                    requirements_updated = False
-                    old_requirements_path = os.path.join(project_root, 'requirements.txt')
-                    new_requirements_path = os.path.join(extracted_folder, 'requirements.txt')
-                    
-                    if os.path.exists(old_requirements_path) and os.path.exists(new_requirements_path):
-                        with open(old_requirements_path, 'r') as f:
-                            old_requirements = f.read()
-                        with open(new_requirements_path, 'r') as f:
-                            new_requirements = f.read()
-                        requirements_updated = old_requirements != new_requirements
-                    
-                    # Copy new files, preserving specified files
-                    for item in os.listdir(extracted_folder):
-                        src = os.path.join(extracted_folder, item)
-                        dst = os.path.join(project_root, item)
-                        
-                        # Skip preserved files
-                        if any(item.startswith(preserve.rstrip('/')) for preserve in preserve_files):
-                            continue
-                        
-                        try:
-                            if os.path.exists(dst):
-                                if os.path.isdir(dst):
-                                    shutil.rmtree(dst)
-                                else:
-                                    os.remove(dst)
-                            
-                            if os.path.isdir(src):
-                                shutil.copytree(src, dst)
-                            else:
-                                shutil.copy2(src, dst)
-                        except Exception as e:
-                            print(f"Error updating {item}: {e}")
-                    
-                    # Update requirements if they changed
-                    if requirements_updated:
-                        self.app.update_status('Updating dependencies...', 'info', '📦')
-                        self._update_requirements()
-                    
-                    # Save the complete commit data so we never ask for this update again
-                    if latest_commit_data:
-                        self._save_installed_commit_data(latest_commit_data)
-                    
-                    self.app.update_status('Update installed! Restarting...', 'success', '✅')
-                    self.app.root.after(2000, self._restart)
-                    
-            else:
+            if response.status_code != 200:
                 self.app.update_status('Download failed', 'error', '❌')
+                return
+            
+            with tempfile.TemporaryDirectory() as temp_dir:
+                zip_path = os.path.join(temp_dir, "update.zip")
+                
+                # Save and extract
+                with open(zip_path, 'wb') as f:
+                    f.write(response.content)
+                
+                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                    zip_ref.extractall(temp_dir)
+                
+                # Find extracted folder
+                extracted_folder = None
+                for item in os.listdir(temp_dir):
+                    if os.path.isdir(os.path.join(temp_dir, item)) and 'gpo-fishing' in item:
+                        extracted_folder = os.path.join(temp_dir, item)
+                        break
+                
+                if not extracted_folder:
+                    self.app.update_status('Extraction failed', 'error', '❌')
+                    return
+                
+                # Get project root
+                project_root = os.path.dirname(os.path.dirname(__file__))
+                
+                # Create backup
+                backup_dir = os.path.join(project_root, f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+                os.makedirs(backup_dir, exist_ok=True)
+                
+                # Files to preserve
+                preserve_files = ['default_settings.json', 'presets', '.git', '.gitignore', 'installed_version.json']
+                
+                # Backup current files
+                for item in os.listdir(project_root):
+                    if item.startswith('backup_'):
+                        continue
+                    src = os.path.join(project_root, item)
+                    dst = os.path.join(backup_dir, item)
+                    try:
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst)
+                        else:
+                            shutil.copy2(src, dst)
+                    except:
+                        pass
+                
+                self.app.update_status('Installing update...', 'info', '⚙️')
+                
+                # Copy new files (except preserved ones)
+                for item in os.listdir(extracted_folder):
+                    if item in preserve_files:
+                        continue
+                    
+                    src = os.path.join(extracted_folder, item)
+                    dst = os.path.join(project_root, item)
+                    
+                    try:
+                        if os.path.exists(dst):
+                            if os.path.isdir(dst):
+                                shutil.rmtree(dst)
+                            else:
+                                os.remove(dst)
+                        
+                        if os.path.isdir(src):
+                            shutil.copytree(src, dst)
+                        else:
+                            shutil.copy2(src, dst)
+                    except Exception as e:
+                        print(f"Error updating {item}: {e}")
+                
+                # Mark this version as installed - THIS IS KEY TO STOP NAGGING
+                self._save_installed_version(commit_data)
+                
+                self.app.update_status('Update complete! Restarting...', 'success', '✅')
+                self.app.root.after(2000, self._restart)
                 
         except Exception as e:
             self.app.update_status(f'Update error: {str(e)[:30]}...', 'error', '❌')
-
-    def _update_requirements(self):
-        """Update Python packages from requirements.txt"""
-        try:
-            import subprocess
-            
-            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            requirements_path = os.path.join(project_root, 'requirements.txt')
-            
-            if os.path.exists(requirements_path):
-                # Try to update requirements
-                result = subprocess.run([
-                    sys.executable, '-m', 'pip', 'install', '-r', requirements_path, '--upgrade'
-                ], capture_output=True, text=True, timeout=120)
-                
-                if result.returncode == 0:
-                    print("Requirements updated successfully")
-                else:
-                    print(f"Requirements update failed: {result.stderr}")
-            
-        except Exception as e:
-            print(f"Error updating requirements: {e}")
 
     def _restart(self):
         """Restart the application"""
         try:
             import subprocess
-            
-            script_path = os.path.abspath(__file__)
             self.app.root.quit()
             self.app.root.destroy()
             
             if getattr(sys, 'frozen', False):
                 subprocess.Popen([sys.executable])
             else:
-                subprocess.Popen([sys.executable, script_path])
+                # Find the main script to restart
+                main_script = None
+                project_root = os.path.dirname(os.path.dirname(__file__))
+                for file in ['main.py', 'app.py', 'run.py']:
+                    if os.path.exists(os.path.join(project_root, file)):
+                        main_script = os.path.join(project_root, file)
+                        break
+                
+                if main_script:
+                    subprocess.Popen([sys.executable, main_script])
+                else:
+                    subprocess.Popen([sys.executable, __file__])
             
             sys.exit(0)
             
         except Exception as e:
             print(f"Restart failed: {e}")
             sys.exit(1)
+
+    def show_pending_update(self):
+        """Show pending update that was delayed during fishing"""
+        if not self.pending_update:
+            return
+        
+        update_info = self.pending_update
+        self._prompt_update(update_info['hash'], update_info['message'], update_info['data'])
+        self.pending_update = None
+
+    def startup_update_check(self):
+        """Check for updates on startup"""
+        if hasattr(self.app, 'auto_update_enabled') and self.app.auto_update_enabled and not self.app.main_loop_active:
+            self.last_check = 0  # Force immediate check
+            threading.Thread(target=self.check_for_updates, daemon=True).start()
 
     def start_auto_update_loop(self):
         """Start the auto-update checking loop"""
