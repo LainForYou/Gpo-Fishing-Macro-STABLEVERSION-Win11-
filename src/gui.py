@@ -563,12 +563,21 @@ Sequence (per user spec):
         if not self.main_loop_active:
             return
         
+        # Double-click point 2 to ensure field is focused and selected
+        self.log(f'Double-clicking Point 2 to focus: {pts[2]}', "verbose")
+        self._click_at(pts[2])
+        threading.Event().wait(0.1)
+        
+        if not self.main_loop_active:
+            return
+        
         # Type amount with state tracking
         self.set_recovery_state("typing", {"action": "typing_amount", "amount": amount})
         self.log(f'Typing amount: {amount}', "verbose")
         # Type amount
         keyboard.write(amount)
-        threading.Event().wait(self.purchase_after_type_delay)
+        # Extra delay to ensure typing is complete
+        threading.Event().wait(self.purchase_after_type_delay + 0.5)
         
         if not self.main_loop_active:
             return
@@ -600,8 +609,8 @@ Sequence (per user spec):
         if not self.main_loop_active:
             return
         
-        # Right-click point 4 to close menu with state tracking
-        self.set_recovery_state("clicking", {"action": "right_click_point_4_close", "point": pts[4]})
+        # Right-click point 4 with state tracking
+        self.set_recovery_state("clicking", {"action": "right_click_point_4", "point": pts[4]})
         print(f'Right-clicking Point 4: {pts[4]}')
         self._right_click_at(pts[4])
         threading.Event().wait(self.purchase_click_delay)

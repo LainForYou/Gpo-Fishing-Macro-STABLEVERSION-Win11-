@@ -294,36 +294,45 @@ class FishingBot:
         if not self.app.main_loop_active:
             return
         
+        # Double-click point 2 to ensure field is focused and selected
+        self._click_at(pts[2])
+        time.sleep(0.1)
+        
+        if not self.app.main_loop_active:
+            return
+        
         self.app.set_recovery_state("typing", {"action": "typing_amount"})
         # Type the amount
         keyboard.write(amount)
-        time.sleep(self.app.purchase_after_type_delay)
+        # Extra delay to ensure typing is complete
+        time.sleep(self.app.purchase_after_type_delay + 0.5)
         
         if not self.app.main_loop_active:
             return
         
         # Continue purchase sequence
+        self.app.set_recovery_state("clicking", {"action": "click_point_1_confirm"})
         self._click_at(pts[1])
         time.sleep(self.app.purchase_click_delay)
         
         if not self.app.main_loop_active:
             return
         
-        # Double-click point 3 to ensure it registers
-        self._click_at(pts[3])
-        time.sleep(0.1)
+        self.app.set_recovery_state("clicking", {"action": "click_point_3"})
         self._click_at(pts[3])
         time.sleep(self.app.purchase_click_delay)
         
         if not self.app.main_loop_active:
             return
         
+        self.app.set_recovery_state("clicking", {"action": "click_point_2_final"})
         self._click_at(pts[2])
         time.sleep(self.app.purchase_click_delay)
         
         if not self.app.main_loop_active:
             return
         
+        self.app.set_recovery_state("clicking", {"action": "right_click_point_4"})
         self._right_click_at(pts[4])
         time.sleep(self.app.purchase_click_delay)
         
