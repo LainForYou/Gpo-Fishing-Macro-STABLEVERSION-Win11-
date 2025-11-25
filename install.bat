@@ -38,18 +38,18 @@ if errorlevel 1 (
     echo.
     echo Trying alternative installation method...
     echo Installing packages individually...
-    pip install customtkinter --no-warn-script-location
-    pip install darkdetect --no-warn-script-location
-    pip install keyboard --no-warn-script-location
-    pip install mss --no-warn-script-location
-    pip install numpy --no-warn-script-location
-    pip install packaging --no-warn-script-location
-    pip install pillow --no-warn-script-location
-    pip install pynput --no-warn-script-location
-    pip install pyinstaller --no-warn-script-location
-    pip install pywin32 --no-warn-script-location
-    pip install pystray --no-warn-script-location
-    pip install six --no-warn-script-location
+    python -m pip install customtkinter --no-warn-script-location
+    python -m pip install darkdetect --no-warn-script-location
+    python -m pip install keyboard --no-warn-script-location
+    python -m pip install mss --no-warn-script-location
+    python -m pip install numpy --no-warn-script-location
+    python -m pip install packaging --no-warn-script-location
+    python -m pip install pillow --no-warn-script-location
+    python -m pip install pynput --no-warn-script-location
+    python -m pip install pyinstaller --no-warn-script-location
+    python -m pip install pywin32 --no-warn-script-location
+    python -m pip install pystray --no-warn-script-location
+    python -m pip install six --no-warn-script-location
     
     if errorlevel 1 (
         echo ERROR: Installation failed completely
