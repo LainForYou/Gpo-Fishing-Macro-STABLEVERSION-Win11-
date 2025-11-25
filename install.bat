@@ -50,6 +50,8 @@ if errorlevel 1 (
     python -m pip install pywin32 --no-warn-script-location
     python -m pip install pystray --no-warn-script-location
     python -m pip install six --no-warn-script-location
+    python -m pip install requests --no-warn-script-location
+
     
     if errorlevel 1 (
         echo ERROR: Installation failed completely
