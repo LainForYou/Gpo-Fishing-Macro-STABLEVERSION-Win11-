@@ -30,7 +30,7 @@ class ZoomController:
             "sequence_delay": 0.2  # Shorter delay between operations
         }
         self.last_zoom_time = 0
-        self.zoom_cooldown = 2.0  # Longer cooldown to prevent conflicts
+        self.zoom_cooldown = 1.0  # Reasonable cooldown to prevent conflicts
         self.zoom_in_progress = False  # Lock to prevent overlapping zoom operations
         
         # Load settings from app if available
@@ -97,7 +97,9 @@ class ZoomController:
                 win32api.mouse_event(win32con.MOUSEEVENTF_WHEEL, 0, 0, -120, 0)
                 time.sleep(self.zoom_settings["step_delay"])
                 
-            self.last_zoom_time = current_time
+            # Only update timestamp if not part of a sequence
+            if not self.zoom_in_progress:
+                self.last_zoom_time = current_time
             logging.info(f"Zoomed out {steps} steps")
             return True
             
@@ -131,7 +133,9 @@ class ZoomController:
                 win32api.mouse_event(win32con.MOUSEEVENTF_WHEEL, 0, 0, 120, 0)
                 time.sleep(self.zoom_settings["step_delay"])
                 
-            self.last_zoom_time = current_time
+            # Only update timestamp if not part of a sequence
+            if not self.zoom_in_progress:
+                self.last_zoom_time = current_time
             logging.info(f"Zoomed in {steps} steps")
             return True
             
