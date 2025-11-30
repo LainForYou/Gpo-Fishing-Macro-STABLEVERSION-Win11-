@@ -1,7 +1,7 @@
 {
   "auto_purchase_enabled": false,
-  "auto_purchase_amount": 11,
-  "loops_per_purchase": 9,
+  "auto_purchase_amount": 10,
+  "loops_per_purchase": 10,
   "point_coords": {
     "1": [
       801,
@@ -22,15 +22,15 @@
       832
     ],
     "bait_point": [
-      958,
-      845
+      953,
+      772
     ]
   },
   "fishing_location": [
     709,
     184
   ],
-  "fruit_storage_enabled": false,
+  "fruit_storage_enabled": true,
   "fruit_storage_key": "2",
   "rod_key": "1",
   "kp": 0.1,
@@ -57,9 +57,9 @@
         200
       ],
       "area": {
-        "x": 1018,
+        "x": 1000,
         "y": 371,
-        "width": 245,
+        "width": 263,
         "height": 472
       },
       "description": "Fishing Bar Detection"
@@ -93,5 +93,5 @@
     "sequence_delay": 0.5,
     "zoom_cooldown": 2.0
   },
-  "last_saved": "2025-11-30T04:51:26.988135"
+  "last_saved": "2025-11-30T05:06:14.512087"
 }

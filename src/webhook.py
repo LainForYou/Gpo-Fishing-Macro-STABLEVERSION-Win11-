@@ -35,7 +35,7 @@ class WebhookManager:
         except Exception as e:
             print(f"❌ Webhook error: {e}")
 
-    def send_devil_fruit_drop(self):
+    def send_devil_fruit_drop(self, drop_info=None):
         """Send webhook notification for devil fruit drops"""
         if not self.app.webhook_url or not self.app.webhook_enabled:
             return
@@ -46,9 +46,16 @@ class WebhookManager:
         try:
             import requests
             
+            # Build description with OCR text if available
+            description = "Devil fruit detected and stored!"
+            if drop_info and drop_info.get('ocr_text'):
+                # Clean up the OCR text for display
+                ocr_text = drop_info['ocr_text'][:100]  # Limit length
+                description += f"\n\n**OCR Text:** {ocr_text}"
+            
             embed = {
                 "title": "🍎 Devil Fruit Caught!",
-                "description": "Devil fruit detected and stored!",
+                "description": description,
                 "color": 0x9c27b0,  # Purple color for devil fruit
                 "fields": [
                     {"name": "🍎 Devil Fruits", "value": str(self.devil_fruit_count), "inline": True},
@@ -58,6 +65,14 @@ class WebhookManager:
                 "footer": {"text": "GPO Autofish - Devil Fruit Caught!"},
                 "timestamp": datetime.utcnow().isoformat()
             }
+            
+            # Add detection confidence if available
+            if drop_info and drop_info.get('keyword_matches'):
+                embed["fields"].append({
+                    "name": "🎯 Detection", 
+                    "value": f"{drop_info['keyword_matches']} keyword matches", 
+                    "inline": True
+                })
             
             payload = {"embeds": [embed], "username": "GPO Autofish Bot"}
             response = requests.post(self.app.webhook_url, json=payload, timeout=10)

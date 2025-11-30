@@ -151,7 +151,7 @@ class FishingBot:
         
         # Start fresh loop
         self.app.log('🎣 Starting fresh fishing loop...', "important")
-        self.app.main_loop_thread = threading.Thread(target=self.run_main_loop, daemon=True)
+        self.app.main_loop_thread = threading.Thread(target=lambda: self.run_main_loop(skip_initial_setup=True), daemon=True)
         self.app.main_loop_thread.start()
         
         self.recovery_in_progress = False
@@ -225,7 +225,7 @@ class FishingBot:
             
             # Start fresh
             self.app.main_loop_active = True
-            self.app.main_loop_thread = threading.Thread(target=self.run_main_loop, daemon=True)
+            self.app.main_loop_thread = threading.Thread(target=lambda: self.run_main_loop(skip_initial_setup=True), daemon=True)
             self.app.main_loop_thread.start()
             
             self.app.log('✅ FORCE RECOVERY COMPLETE - Fresh start initiated', "important")
@@ -960,6 +960,9 @@ class FishingBot:
         """Perform initial setup: zoom out, specific zoom in, auto buy if enabled"""
         print("🔧 Performing initial setup...")
         
+        # Update heartbeat to prevent watchdog from triggering during setup
+        self.update_heartbeat()
+        
         # Step 1: Auto zoom (only if enabled)
         auto_zoom_enabled = getattr(self.app, 'auto_zoom_var', None) and self.app.auto_zoom_var.get()
         
@@ -968,13 +971,15 @@ class FishingBot:
                 if self.app.zoom_controller.is_available():
                     print("🔍 Step 1: Full zoom out...")
                     success_out = self.app.zoom_controller.reset_zoom()
-                    print(f"   Zoom out result: {success_out}")
+                    print(f"Zoom out result: {success_out}")
+                    self.update_heartbeat()  # Update after zoom out
                     time.sleep(0.5)
                     
                     # Step 2: Specific zoom in
                     print("🔍 Step 2: Specific zoom in...")
                     success_in = self.app.zoom_controller.zoom_in()
-                    print(f"   Zoom in result: {success_in}")
+                    print(f"Zoom in result: {success_in}")
+                    self.update_heartbeat()  # Update after zoom in
                     time.sleep(0.5)
                 else:
                     print("🔍 Zoom controller not available (missing pywin32)")
@@ -989,6 +994,7 @@ class FishingBot:
             self.app.set_recovery_state("purchasing", {"sequence": "initial_auto_purchase"})
             self.perform_auto_purchase()
         
+        self.update_heartbeat()  # Final heartbeat update
         print("✅ Initial setup complete")
     
     def process_post_catch_workflow(self):
