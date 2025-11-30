@@ -488,12 +488,117 @@ class FishingBot:
         except Exception as e:
             pass
     
+    def validate_fishing_detection(self, img, real_area, target_color, dark_color, white_color):
+        """Enhanced validation of fishing bar detection with confidence scoring"""
+        try:
+            real_height = real_area['height']
+            real_width = real_area['width']
+            
+            # Count color pixels for validation
+            blue_pixels = 0
+            dark_pixels = 0
+            white_pixels = 0
+            total_pixels = real_height * real_width
+            
+            for row_idx in range(real_height):
+                for col_idx in range(real_width):
+                    b, g, r = img[row_idx, col_idx, 0:3]
+                    
+                    # Count target color (blue bar)
+                    if r == target_color[0] and g == target_color[1] and b == target_color[2]:
+                        blue_pixels += 1
+                    # Count dark areas (fish zones)
+                    elif r == dark_color[0] and g == dark_color[1] and b == dark_color[2]:
+                        dark_pixels += 1
+                    # Count white areas (indicator)
+                    elif r == white_color[0] and g == white_color[1] and b == white_color[2]:
+                        white_pixels += 1
+            
+            # Calculate confidence metrics
+            blue_ratio = blue_pixels / total_pixels
+            dark_ratio = dark_pixels / total_pixels
+            white_ratio = white_pixels / total_pixels
+            
+            # Validation criteria
+            has_sufficient_blue = blue_ratio > 0.05  # At least 5% blue (bar outline)
+            has_sufficient_dark = dark_ratio > 0.1   # At least 10% dark (fish area)
+            has_white_indicator = white_ratio > 0.02  # At least 2% white (indicator)
+            
+            # Overall confidence score
+            confidence = 0.0
+            if has_sufficient_blue:
+                confidence += 0.3
+            if has_sufficient_dark:
+                confidence += 0.4
+            if has_white_indicator:
+                confidence += 0.3
+            
+            # Bonus for balanced ratios (good fishing bar should have these proportions)
+            if 0.1 < dark_ratio < 0.6 and 0.02 < white_ratio < 0.2:
+                confidence += 0.1
+            
+            validation_result = {
+                'is_valid': confidence > 0.6,
+                'confidence': confidence,
+                'blue_ratio': blue_ratio,
+                'dark_ratio': dark_ratio,
+                'white_ratio': white_ratio,
+                'metrics': {
+                    'sufficient_blue': has_sufficient_blue,
+                    'sufficient_dark': has_sufficient_dark,
+                    'has_white': has_white_indicator
+                }
+            }
+            
+            return validation_result
+            
+        except Exception as e:
+            print(f"❌ Detection validation error: {e}")
+            return {'is_valid': False, 'confidence': 0.0}
+    
+    def calculate_smart_control_zones(self, dark_sections, white_top_y, real_height):
+        """Calculate smart control zones with weighted scoring"""
+        if not dark_sections or white_top_y is None:
+            return None
+        
+        # Enhanced section analysis
+        for section in dark_sections:
+            section['size'] = section['end'] - section['start'] + 1
+            section['relative_size'] = section['size'] / real_height
+            
+            # Distance from white indicator (closer = more relevant)
+            section['distance_to_white'] = abs(section['middle'] - white_top_y)
+            section['relative_distance'] = section['distance_to_white'] / real_height
+            
+            # Confidence scoring (larger sections closer to white indicator are better)
+            size_score = min(1.0, section['relative_size'] / 0.2)  # Normalize to 20% of height
+            distance_score = max(0.1, 1.0 - (section['relative_distance'] * 2))  # Closer is better
+            
+            section['confidence'] = (size_score * 0.6) + (distance_score * 0.4)
+            section['control_weight'] = section['confidence'] * section['size']
+        
+        # Select best section based on weighted scoring
+        best_section = max(dark_sections, key=lambda s: s['control_weight'])
+        
+        return {
+            'target_section': best_section,
+            'all_sections': dark_sections,
+            'section_count': len(dark_sections),
+            'total_dark_area': sum(s['size'] for s in dark_sections),
+            'confidence': best_section['confidence']
+        }
+    
     def run_main_loop(self):
-        """Main fishing loop with aggressive monitoring"""
-        print('🎣 Main loop started with watchdog protection')
+        """Main fishing loop with enhanced smart detection and control"""
+        print('🎣 Main loop started with enhanced smart detection')
         target_color = (85, 170, 255)
         dark_color = (25, 25, 25)
         white_color = (255, 255, 255)
+        
+        # Simplified control parameters
+        self.error_smoothing = []  # Smooth error values for stability
+        self.fishing_success_rate = 0.8  # Track success rate for adaptive timeouts
+        self.recent_catches = []  # Track recent fishing attempts
         
         # Start watchdog for stuck state detection
         if not self.watchdog_active:
@@ -543,18 +648,40 @@ class FishingBot:
                             # Update heartbeat frequently during detection
                             self.update_heartbeat()
                             
-                            # Timeout check - if no fish detected for too long, recast
+                            # Smart adaptive timeout system
                             current_time = time.time()
-                            if current_time - detection_start_time > self.app.scan_timeout:
+                            
+                            # Calculate adaptive timeout based on success rate
+                            base_timeout = self.app.scan_timeout
+                            if self.fishing_success_rate > 0.7:
+                                # High success rate - can wait longer for fish
+                                adaptive_timeout = base_timeout * 1.3
+                            elif self.fishing_success_rate < 0.4:
+                                # Low success rate - shorter timeout to try more frequently
+                                adaptive_timeout = base_timeout * 0.7
+                            else:
+                                adaptive_timeout = base_timeout
+                            
+                            if current_time - detection_start_time > adaptive_timeout:
                                 if not detected:
-                                    print(f'⏰ No fish detected after {self.app.scan_timeout}s, recasting...')
+                                    print(f'⏰ No fish detected after {adaptive_timeout:.1f}s (adaptive), recasting...')
+                                    # Track failed attempt
+                                    self.recent_catches.append(False)
+                                    if len(self.recent_catches) > 10:
+                                        self.recent_catches.pop(0)
+                                    self.fishing_success_rate = sum(self.recent_catches) / len(self.recent_catches)
                                     break
-                                elif current_time - detection_start_time > self.app.scan_timeout + 15:
-                                    print(f'⏰ Fish control timeout after {self.app.scan_timeout + 15}s, recasting...')
+                                elif current_time - detection_start_time > adaptive_timeout + 15:
+                                    print(f'⏰ Fish control timeout after {adaptive_timeout + 15:.1f}s, recasting...')
                                     # Clean up mouse state before recasting
                                     if self.app.is_clicking:
                                         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
                                         self.app.is_clicking = False
+                                    # Track failed attempt
+                                    self.recent_catches.append(False)
+                                    if len(self.recent_catches) > 10:
+                                        self.recent_catches.pop(0)
+                                    self.fishing_success_rate = sum(self.recent_catches) / len(self.recent_catches)
                                     break
                             
                             # Get screenshot with error handling
@@ -612,6 +739,12 @@ class FishingBot:
                                         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
                                         self.app.is_clicking = False
                                     
+                                    # Track successful catch for adaptive learning
+                                    self.recent_catches.append(True)
+                                    if len(self.recent_catches) > 10:
+                                        self.recent_catches.pop(0)
+                                    self.fishing_success_rate = sum(self.recent_catches) / len(self.recent_catches)
+                                    
                                     # Increment fish counter when fish is actually caught
                                     self.app.increment_fish_counter()
                                     
@@ -622,7 +755,8 @@ class FishingBot:
                                     was_detecting = False
                                     self.check_and_purchase()
                                     # Continue to next fishing cycle
-                                    print('🐟 Fish processing complete')
+                                    success_pct = int(self.fishing_success_rate * 100)
+                                    print(f'🐟 Fish processing complete | Success Rate: {success_pct}%')
                                     break
                                 
                                 time.sleep(0.1)
@@ -687,6 +821,8 @@ class FishingBot:
                             real_screenshot = sct.grab(real_monitor)
                             real_img = np.array(real_screenshot)
                             
+                            # Skip validation for now - keep it simple
+                            
                             # Find white indicator
                             white_top_y = None
                             white_bottom_y = None
@@ -740,7 +876,7 @@ class FishingBot:
                                 section_end = real_y + real_height - 1 - gap_counter
                                 dark_sections.append({'start': current_section_start, 'end': section_end, 'middle': (current_section_start + section_end) // 2})
                             
-                            # Control the fishing
+                            # Enhanced smart fishing control
                             if dark_sections and white_top_y is not None:
                                 if not was_detecting:
                                     # First time detecting fish - don't increment counter yet
@@ -748,7 +884,7 @@ class FishingBot:
                                     self.app.set_recovery_state("fishing", {"action": "fish_control_active"})
                                 was_detecting = True
                                 
-                                # Calculate error and control
+                                # Original simple control logic (BACK TO WORKING VERSION)
                                 for section in dark_sections:
                                     section['size'] = section['end'] - section['start'] + 1
                                 largest_section = max(dark_sections, key=lambda s: s['size'])
@@ -761,7 +897,7 @@ class FishingBot:
                                 
                                 print(f'Error: {raw_error}px, PD: {pd_output:.2f}')
                                 
-                                # Control mouse
+                                # Original simple control logic
                                 if pd_output > 0:
                                     if not self.app.is_clicking:
                                         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
