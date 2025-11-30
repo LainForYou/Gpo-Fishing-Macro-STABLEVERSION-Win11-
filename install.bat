@@ -19,6 +19,18 @@ if errorlevel 1 (
 for /f "tokens=2" %%i in ('python --version 2^>^&1') do set PYTHON_VERSION=%%i
 echo ✓ Python %PYTHON_VERSION% found
 
+REM Check if Python 3.14 and warn about potential compatibility issues
+echo %PYTHON_VERSION% | findstr /C:"3.14" >nul
+if not errorlevel 1 (
+    echo.
+    echo ⚠️  NOTICE: Python 3.14 detected
+    echo Some packages may need nightly builds for compatibility
+    echo We'll handle this automatically during installation
+    set PYTHON_314=true
+) else (
+    set PYTHON_314=false
+)
+
 echo.
 echo [2/4] Upgrading pip to latest version...
 python -m pip install --upgrade pip >nul 2>&1
@@ -45,18 +57,49 @@ python -m pip install pystray --no-warn-script-location
 
 echo Installing OCR packages for text recognition...
 echo.
+
+REM Handle Python 3.14 compatibility issues
+if "%PYTHON_314%"=="true" (
+    echo Python 3.14 detected - installing compatible packages...
+    echo.
+    echo Installing scikit-image nightly build for Python 3.14 compatibility...
+    python -m pip install -i https://pypi.anaconda.org/scientific-python-nightly-wheels/simple scikit-image --no-warn-script-location
+    if errorlevel 1 (
+        echo Warning: Nightly scikit-image installation failed, trying standard method...
+    ) else (
+        echo ✓ scikit-image nightly build installed
+    )
+    echo.
+)
+
 echo Installing EasyOCR (primary text recognition)...
 python -m pip install easyocr
 if errorlevel 1 (
     echo EasyOCR installation failed, trying alternative methods...
     echo.
-    echo Method 1: Installing with --user flag...
+    
+    REM For Python 3.14, try nightly builds first
+    if "%PYTHON_314%"=="true" (
+        echo Method 1: Installing EasyOCR dependencies with nightly builds...
+        python -m pip install torch torchvision --no-warn-script-location
+        python -m pip install -i https://pypi.anaconda.org/scientific-python-nightly-wheels/simple scikit-image --no-warn-script-location
+        python -m pip install opencv-python pillow numpy --no-warn-script-location
+        python -m pip install easyocr --no-warn-script-location
+        if not errorlevel 1 (
+            echo ✓ EasyOCR installed with nightly builds
+            goto :easyocr_success
+        )
+        echo Nightly build method failed, trying standard methods...
+        echo.
+    )
+    
+    echo Method 2: Installing with --user flag...
     python -m pip install --user easyocr
     if errorlevel 1 (
-        echo Method 2: Installing with --force-reinstall...
+        echo Method 3: Installing with --force-reinstall...
         python -m pip install --force-reinstall easyocr
         if errorlevel 1 (
-            echo Method 3: Installing dependencies separately...
+            echo Method 4: Installing dependencies separately...
             python -m pip install torch torchvision
             python -m pip install opencv-python
             python -m pip install pillow
@@ -65,10 +108,21 @@ if errorlevel 1 (
             if errorlevel 1 (
                 echo WARNING: EasyOCR installation failed completely
                 echo.
-                echo Manual installation required:
-                echo 1. Open Command Prompt as Administrator
-                echo 2. Run: pip install easyocr
-                echo 3. If that fails, try: pip install --user easyocr
+                if "%PYTHON_314%"=="true" (
+                    echo This is likely due to Python 3.14 compatibility issues.
+                    echo.
+                    echo Manual installation options:
+                    echo 1. Install nightly builds manually:
+                    echo    pip install -i https://pypi.anaconda.org/scientific-python-nightly-wheels/simple scikit-image
+                    echo    pip install easyocr
+                    echo 2. Consider using Python 3.13 for better compatibility
+                    echo 3. Wait for official Python 3.14 support
+                ) else (
+                    echo Manual installation required:
+                    echo 1. Open Command Prompt as Administrator
+                    echo 2. Run: pip install easyocr
+                    echo 3. If that fails, try: pip install --user easyocr
+                )
                 echo.
                 echo The app will use fallback text detection without OCR
             ) else (
@@ -83,6 +137,8 @@ if errorlevel 1 (
 ) else (
     echo ✓ EasyOCR installed successfully
 )
+
+:easyocr_success
 
 echo.
 echo Installing OpenCV for image processing...
