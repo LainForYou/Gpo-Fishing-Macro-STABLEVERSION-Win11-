@@ -43,22 +43,53 @@ python -m pip install requests --no-warn-script-location
 python -m pip install pywin32 --no-warn-script-location
 python -m pip install pystray --no-warn-script-location
 
-echo Installing lightweight OCR packages...
-echo Trying PaddleOCR (lightweight alternative)...
-python -m pip install paddlepaddle --no-warn-script-location
-python -m pip install paddleocr --no-warn-script-location
-python -m pip install opencv-python --no-warn-script-location
+echo Installing OCR packages for text recognition...
+echo.
+echo Installing EasyOCR (primary text recognition)...
+python -m pip install easyocr
 if errorlevel 1 (
-    echo PaddleOCR failed, trying EasyOCR...
-    python -m pip install easyocr --no-warn-script-location
+    echo EasyOCR installation failed, trying alternative methods...
+    echo.
+    echo Method 1: Installing with --user flag...
+    python -m pip install --user easyocr
     if errorlevel 1 (
-        echo WARNING: All OCR packages failed - using fallback text detection
-        echo The app will still detect drops but without reading text
+        echo Method 2: Installing with --force-reinstall...
+        python -m pip install --force-reinstall easyocr
+        if errorlevel 1 (
+            echo Method 3: Installing dependencies separately...
+            python -m pip install torch torchvision
+            python -m pip install opencv-python
+            python -m pip install pillow
+            python -m pip install numpy
+            python -m pip install easyocr
+            if errorlevel 1 (
+                echo WARNING: EasyOCR installation failed completely
+                echo.
+                echo Manual installation required:
+                echo 1. Open Command Prompt as Administrator
+                echo 2. Run: pip install easyocr
+                echo 3. If that fails, try: pip install --user easyocr
+                echo.
+                echo The app will use fallback text detection without OCR
+            ) else (
+                echo ✓ EasyOCR installed via dependency method
+            )
+        ) else (
+            echo ✓ EasyOCR installed via force-reinstall
+        )
     ) else (
-        echo ✓ EasyOCR installed as backup
+        echo ✓ EasyOCR installed via --user flag
     )
 ) else (
-    echo ✓ PaddleOCR installed - lightweight text recognition ready!
+    echo ✓ EasyOCR installed successfully
+)
+
+echo.
+echo Installing OpenCV for image processing...
+python -m pip install opencv-python
+if errorlevel 1 (
+    echo OpenCV installation failed, trying --user flag...
+    python -m pip install --user opencv-python
 )
 
 echo Installing optional UI packages...
@@ -102,7 +133,7 @@ python -c "import pystray; print('✓ pystray')" 2>nul || echo ✗ pystray MISSI
 
 echo Checking optional modules...
 echo ✓ pystray already verified above
-python -c "import paddleocr; print('✓ PaddleOCR (lightweight text recognition)')" 2>nul || python -c "import easyocr; print('✓ EasyOCR (text recognition)')" 2>nul || echo ✗ OCR (using fallback detection)
+python -c "import easyocr; print('✓ EasyOCR (text recognition available)')" 2>nul || echo ✗ EasyOCR (text recognition disabled - using fallback detection)
 python -c "import cv2; print('✓ opencv-python (image processing)')" 2>nul || echo ✗ opencv-python (image processing disabled)
 
 echo.
@@ -146,7 +177,7 @@ echo   ✓ Text recognition for drops (OCR)
 echo   ✓ Auto zoom control
 echo.
 echo OCR Status:
-python -c "import paddleocr; print('✓ PaddleOCR ready - lightweight text recognition available')" 2>nul || python -c "import easyocr; print('✓ EasyOCR ready - text recognition available')" 2>nul || echo ⚠️  Using fallback detection - drops detected but text not readable
+python -c "import easyocr; print('✓ EasyOCR ready - text recognition available!')" 2>nul || echo ⚠️  EasyOCR not available - using fallback detection (drops detected but text not readable)
 echo.
 echo Press any key to exit...
 pause >nul
