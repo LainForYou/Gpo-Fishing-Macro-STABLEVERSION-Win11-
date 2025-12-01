@@ -66,20 +66,35 @@ The original closed-source macro is sketchy and often flagged by antivirus softw
 
 ## Installation
 
+### ⚠️ Python Version Requirement
+
+**IMPORTANT**: This application requires **Python 3.12 or 3.13**.
+
+- ❌ **Python 3.14+ is NOT supported** due to compatibility issues with required packages (EasyOCR, PyTorch, etc.)
+- ✅ **Recommended**: Python 3.13.0 (most stable)
+- ✅ **Alternative**: Python 3.12.7
+
+**Download Links:**
+
+- [Python 3.13.0](https://www.python.org/ftp/python/3.13.0/python-3.13.0-amd64.exe) (Recommended)
+- [Python 3.12.7](https://www.python.org/ftp/python/3.12.7/python-3.12.7-amd64.exe) (Alternative)
+
 ### 🚀 Easy Installation (Recommended)
 
-1. **Download the repository** as ZIP and extract it
-2. **Double-click `install.bat`** - This will:
-   - Check if Python is installed
+1. **Install Python 3.12 or 3.13** (see links above) - Make sure to check "Add Python to PATH"
+2. **Download the repository** as ZIP and extract it
+3. **Double-click `install.bat`** - This will:
+   - Check if Python is installed and verify version compatibility
    - Install all required packages automatically
    - Set everything up for you
-3. **Run the application:**
+4. **Run the application:**
    - **With console:** Double-click `run.bat`
    - **Silent mode:** Double-click `run_silent.bat` (completely hidden)
 
 ### 🔧 Manual Installation
 
-1. **Install Python** from https://python.org (check "Add to PATH")
+1. **Install Python 3.12 or 3.13** from the links above (check "Add to PATH")
+   - ⚠️ **Do NOT use Python 3.14+** - it will cause installation failures
 2. **Clone or download this repository**
    ```bash
    git clone https://github.com/yourusername/gpo-autofish.git
@@ -140,9 +155,11 @@ The original closed-source macro is sketchy and often flagged by antivirus softw
 
 ### Installation Issues
 
-- **"Python not found"**: Download from https://python.org and check "Add to PATH"
+- **"Python not found"**: Download Python 3.12 or 3.13 from the links above and check "Add to PATH"
+- **"Python 3.14+ not supported"**: Uninstall Python 3.14+ and install Python 3.13 or 3.12 instead
 - **"pip not recognized"**: Reinstall Python with "Add to PATH" checked
 - **Permission errors**: Right-click `install.bat` → "Run as administrator"
+- **Package installation failures**: Ensure you're using Python 3.12 or 3.13, not 3.14+
 
 ### Runtime Issues
 

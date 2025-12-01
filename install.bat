@@ -9,7 +9,7 @@ python --version >nul 2>&1
 if errorlevel 1 (
     echo ERROR: Python is not installed or not in PATH
     echo.
-    echo Please install Python 3.8+ from https://python.org
+    echo Please install Python 3.12 or 3.13 from https://python.org
     echo Make sure to check "Add Python to PATH" during installation
     echo.
     pause
@@ -117,7 +117,7 @@ if errorlevel 1 (
         echo Possible solutions:
         echo 1. Run as administrator
         echo 2. Check your internet connection
-        echo 3. Update Python to latest version
+        echo 3. Use Python 3.12 or 3.13 (not 3.14+)
         echo 4. Disable antivirus temporarily
         echo.
         pause

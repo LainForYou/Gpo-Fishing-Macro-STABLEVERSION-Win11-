@@ -23,15 +23,7 @@ REM Look for Python installations in order of preference
 set PYTHON_EXE=
 set PYTHON_FOUND=0
 
-echo Looking for Python 3.14 installation...
-if exist "C:\Users\%USERNAME%\AppData\Local\Programs\Python\Python314\python.exe" (
-    set PYTHON_EXE=C:\Users\%USERNAME%\AppData\Local\Programs\Python\Python314\python.exe
-    set PYTHON_FOUND=1
-    echo Found Python 3.14 at: !PYTHON_EXE!
-    goto python_found
-)
-
-echo Python 3.14 not found, looking for Python 3.13...
+echo Looking for Python 3.13 installation...
 if exist "C:\Users\%USERNAME%\AppData\Local\Programs\Python\Python313\python.exe" (
     set PYTHON_EXE=C:\Users\%USERNAME%\AppData\Local\Programs\Python\Python313\python.exe
     set PYTHON_FOUND=1
@@ -57,7 +49,8 @@ if not errorlevel 1 (
 )
 
 echo ERROR: No Python installation found
-echo Please install Python 3.12+ from https://python.org
+echo Please install Python 3.12 or 3.13 from https://python.org
+echo Python 3.14+ is not supported due to package compatibility issues
 pause
 exit /b 1
 

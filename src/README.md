@@ -2,6 +2,13 @@
 
 This directory contains the refactored source code for GPO Autofish, organized into modular components.
 
+## Python Version Requirement
+
+**IMPORTANT**: This application requires **Python 3.12 or 3.13 only**.
+
+- ❌ Python 3.14+ is NOT supported due to package compatibility issues
+- ✅ Use Python 3.13.0 (recommended) or Python 3.12.7
+
 ## File Structure
 
 - `main.py` - Entry point for the application
