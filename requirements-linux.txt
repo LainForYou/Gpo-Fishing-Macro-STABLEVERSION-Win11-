@@ -1,0 +1,21 @@
+# GPO Autofish - Linux-Specific Dependencies
+# Install with: pip3 install -r requirements-linux.txt
+
+# Include all common dependencies
+-r requirements-common.txt
+
+# Linux-specific packages (if needed in future)
+# python-xlib  # Uncomment for native Linux X11 mouse control
+
+# Note: PyAutoGUI from requirements-common.txt provides cross-platform support
+
+# System packages you may need to install (not via pip):
+# Ubuntu/Debian:
+#   sudo apt install python3-tk python3-dev
+#   sudo apt install libgl1-mesa-glx libglib2.0-0  # For OpenCV
+#   sudo apt install scrot  # For mss screenshots
+#   sudo apt install python3-xlib  # For pynput
+#
+# Fedora/RHEL:
+#   sudo dnf install python3-tkinter python3-devel
+#   sudo dnf install mesa-libGL glib2

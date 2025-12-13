@@ -1,7 +1,9 @@
 @echo off
 setlocal enabledelayedexpansion
+cd /d "%~dp0\..\..\"
 echo ========================================
 echo   GPO Autofish - Easy Installation
+echo   [Windows]
 echo ========================================
 echo.
 
@@ -118,6 +120,16 @@ if errorlevel 1 (
     echo ✓ pywin32 installed
 )
 
+echo Installing pyautogui ^(cross-platform fallback^)...
+python -m pip install pyautogui >nul 2>&1
+if errorlevel 1 (
+    echo ✗ pyautogui failed
+    set FAILED_PACKAGES=!FAILED_PACKAGES! pyautogui
+    set /a FAILED_COUNT+=1
+) else (
+    echo ✓ pyautogui installed
+)
+
 echo Installing pystray...
 python -m pip install pystray >nul 2>&1
 if errorlevel 1 (
@@ -193,7 +205,8 @@ echo   Installation Complete!
 echo ========================================
 echo.
 echo To run GPO Autofish:
-echo   • Double-click "run.bat" (recommended)
+echo   • Double-click "installers\windows\run.bat" (recommended)
+echo   • Or double-click "installers\windows\run_dev.bat" for debug mode
 echo   • Or run "python src/main.py" in command prompt
 echo.
 echo Press any key to exit...

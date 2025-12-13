@@ -1,0 +1,11 @@
+# GPO Autofish - macOS-Specific Dependencies
+# Install with: pip3 install -r requirements-mac.txt
+
+# Include all common dependencies
+-r requirements-common.txt
+
+# macOS-specific packages (if needed in future)
+# pyobjc-framework-Quartz  # Uncomment for native macOS mouse control
+# pyobjc-framework-Cocoa
+
+# Note: PyAutoGUI from requirements-common.txt provides cross-platform support

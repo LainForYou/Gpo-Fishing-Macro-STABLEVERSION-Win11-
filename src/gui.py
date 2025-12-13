@@ -9,12 +9,11 @@ import sys
 import ctypes
 import mss
 import numpy as np
-import win32api
-import win32con
 import json
 import os
 import time
 from datetime import datetime
+from platform_adapter import mouse as platform_mouse
 # Tray functionality removed - F4 now minimizes to taskbar
 
 try:
@@ -760,40 +759,18 @@ class HotkeyGUI:
 
 
     def _click_at(self, coords):
-        """Move cursor to coords and perform a left click (Windows 10/11 compatible)."""
+        """Move cursor to coords and perform a left click (cross-platform)."""
         try:
             x, y = (int(coords[0]), int(coords[1]))
-            # Convert to normalized absolute coordinates (0-65535)
-            screen_width = win32api.GetSystemMetrics(0)
-            screen_height = win32api.GetSystemMetrics(1)
-            nx = int(x * 65535 / screen_width)
-            ny = int(y * 65535 / screen_height)
-            
-            # Move and click using absolute coordinates
-            win32api.mouse_event(win32con.MOUSEEVENTF_ABSOLUTE | win32con.MOUSEEVENTF_MOVE, nx, ny, 0, 0)
-            threading.Event().wait(0.05)
-            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
-            threading.Event().wait(0.05)
-            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
+            platform_mouse.click_at(x, y, button='left')
         except Exception as e:
             print(f'Error clicking at {coords}: {e}')
 
     def _right_click_at(self, coords):
-        """Move cursor to coords and perform a right click (Windows 10/11 compatible)."""
+        """Move cursor to coords and perform a right click (cross-platform)."""
         try:
             x, y = (int(coords[0]), int(coords[1]))
-            # Convert to normalized absolute coordinates (0-65535)
-            screen_width = win32api.GetSystemMetrics(0)
-            screen_height = win32api.GetSystemMetrics(1)
-            nx = int(x * 65535 / screen_width)
-            ny = int(y * 65535 / screen_height)
-            
-            # Move and click using absolute coordinates
-            win32api.mouse_event(win32con.MOUSEEVENTF_ABSOLUTE | win32con.MOUSEEVENTF_MOVE, nx, ny, 0, 0)
-            threading.Event().wait(0.05)
-            win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, 0)
-            threading.Event().wait(0.05)
-            win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTUP, 0, 0, 0, 0)
+            platform_mouse.click_at(x, y, button='right')
         except Exception as e:
             print(f'Error right-clicking at {coords}: {e}')
 
@@ -1094,7 +1071,7 @@ Sequence (per user spec):
         
         # Release mouse if clicking
         if self.is_clicking:
-            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
+            platform_mouse.mouse_up('left')
             self.is_clicking = False
         
         # Update UI
@@ -1227,9 +1204,9 @@ Sequence (per user spec):
     def cast_line(self):
         """Perform the casting action: hold click for 1 second then release"""
         self.log('Casting line...', "verbose")
-        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
+        platform_mouse.mouse_down('left')
         threading.Event().wait(1.0)
-        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
+        platform_mouse.mouse_up('left')
         self.is_clicking = False
         
         # Update activity tracking

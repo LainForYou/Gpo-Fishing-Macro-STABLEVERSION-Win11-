@@ -2,8 +2,9 @@ import threading
 import time
 import mss
 import numpy as np
+import win32api
+import win32con
 import keyboard
-from platform_adapter import mouse
 
 class FishingBot:
     def __init__(self, app):
@@ -13,8 +14,6 @@ class FishingBot:
         self.watchdog_thread = None
         self.last_loop_heartbeat = time.time()
         self.force_stop_flag = False
-        self.last_fruit_spawn_time = 0  # Track when last fruit spawn was detected
-        self.fruit_spawn_cooldown = 15 * 60  # 15 minutes cooldown after detecting spawn
     
     def check_recovery_needed(self):
         """Smart recovery check - detects genuinely stuck states"""
@@ -130,7 +129,7 @@ class FishingBot:
         # Clean up mouse state immediately
         try:
             if self.app.is_clicking:
-                mouse.mouse_up('left')
+                win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
                 self.app.is_clicking = False
         except:
             pass
@@ -193,7 +192,7 @@ class FishingBot:
         
         # Release mouse IMMEDIATELY
         try:
-            mouse.mouse_up('left')
+            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
             self.app.is_clicking = False
         except:
             pass
@@ -244,8 +243,9 @@ class FishingBot:
         
         # Right-click to clear any menus before casting
         try:
+            import win32api
             print(f"🖱️ Right-clicking at fishing position")
-            current_pos = mouse.get_position()
+            current_pos = win32api.GetCursorPos()
             self.app._right_click_at(current_pos)
             time.sleep(0.3)
         except Exception as e:
@@ -342,13 +342,14 @@ class FishingBot:
                 print(f"🎯 Moving mouse to custom fishing position: ({fishing_x}, {fishing_y})")
             else:
                 # Fallback to default center-top position
-                screen_width, screen_height = mouse.get_screen_size()
+                screen_width = win32api.GetSystemMetrics(0)  # SM_CXSCREEN
+                screen_height = win32api.GetSystemMetrics(1)  # SM_CYSCREEN
                 fishing_x = screen_width // 2
                 fishing_y = screen_height // 3
                 print(f"🎯 Moving mouse to default fishing position: ({fishing_x}, {fishing_y})")
             
             # Only move mouse to position, don't click yet
-            mouse.move_to(fishing_x, fishing_y)
+            win32api.SetCursorPos((fishing_x, fishing_y))
             time.sleep(0.1)
             
         except Exception as e:
@@ -464,7 +465,9 @@ class FishingBot:
             print(f"🎯 Right-clicking at custom fishing location: {fishing_coords}")
         else:
             # Fallback to default center-top position
-            screen_width, screen_height = mouse.get_screen_size()
+            import win32api
+            screen_width = win32api.GetSystemMetrics(0)
+            screen_height = win32api.GetSystemMetrics(1)
             fishing_coords = (screen_width // 2, screen_height // 3)
             print(f"🎯 Right-clicking at default fishing location: {fishing_coords}")
         
@@ -483,7 +486,10 @@ class FishingBot:
         """Click at coordinates"""
         try:
             x, y = (int(coords[0]), int(coords[1]))
-            mouse.click_at(x, y, button='left')
+            win32api.SetCursorPos((x, y))
+            win32api.mouse_event(win32con.MOUSEEVENTF_MOVE, 0, 1, 0, 0)
+            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
+            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
         except Exception as e:
             pass
     
@@ -491,7 +497,12 @@ class FishingBot:
         """Right click at coordinates"""
         try:
             x, y = (int(coords[0]), int(coords[1]))
-            mouse.click_at(x, y, button='right')
+            win32api.SetCursorPos((x, y))
+            win32api.mouse_event(win32con.MOUSEEVENTF_MOVE, 0, 1, 0, 0)
+            threading.Event().wait(0.05)
+            win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, 0)
+            threading.Event().wait(0.05)
+            win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTUP, 0, 0, 0, 0)
         except Exception as e:
             pass
     
@@ -654,7 +665,6 @@ class FishingBot:
                         print('Scanning for blue fishing bar...')
                         
                         detection_start_time = time.time()
-                        
                         while self.app.main_loop_active and not self.force_stop_flag:
                             # Update heartbeat frequently during detection
                             self.update_heartbeat()
@@ -686,7 +696,7 @@ class FishingBot:
                                     print(f'⏰ Fish control timeout after {adaptive_timeout + 15:.1f}s, recasting...')
                                     # Clean up mouse state before recasting
                                     if self.app.is_clicking:
-                                        mouse.mouse_up('left')
+                                        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
                                         self.app.is_clicking = False
                                     # Track failed attempt
                                     self.recent_catches.append(False)
@@ -751,7 +761,7 @@ class FishingBot:
                                     
                                     # Clean up mouse state immediately
                                     if self.app.is_clicking:
-                                        mouse.mouse_up('left')
+                                        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
                                         self.app.is_clicking = False
                                     
                                     # Track successful catch for adaptive learning
@@ -915,11 +925,11 @@ class FishingBot:
                                 # Original simple control logic
                                 if pd_output > 0:
                                     if not self.app.is_clicking:
-                                        mouse.mouse_down('left')
+                                        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
                                         self.app.is_clicking = True
                                 else:
                                     if self.app.is_clicking:
-                                        mouse.mouse_up('left')
+                                        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
                                         self.app.is_clicking = False
                             
                             time.sleep(0.1)
@@ -949,7 +959,7 @@ class FishingBot:
             # Clean up mouse state
             if self.app.is_clicking:
                 try:
-                    mouse.mouse_up('left')
+                    win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
                     self.app.is_clicking = False
                 except:
                     pass
@@ -1099,27 +1109,6 @@ class FishingBot:
             if not hasattr(self.app, 'ocr_manager') or not self.app.ocr_manager.get_stats()['available']:
                 print("📝 OCR not available, skipping drop search")
                 return drop_info
-            
-            # Check for fruit spawns DURING post-catch (doesn't interfere with fishing control)
-            current_time = time.time()
-            time_since_last_spawn = current_time - self.last_fruit_spawn_time
-            
-            # Only check if we're outside the 15min cooldown after last detection
-            if time_since_last_spawn > self.fruit_spawn_cooldown:
-                try:
-                    spawn_text = self.app.ocr_manager.extract_text()
-                    if spawn_text:
-                        fruit_name = self.app.ocr_manager.detect_fruit_spawn(spawn_text)
-                        if fruit_name:
-                            print(f"🌟 Devil fruit spawn detected: {fruit_name}")
-                            # Record detection time for cooldown
-                            self.last_fruit_spawn_time = current_time
-                            print(f"⏰ Fruit spawn cooldown activated - won't check again for 15 minutes")
-                            # Send webhook
-                            if hasattr(self.app, 'webhook_manager') and getattr(self.app, 'fruit_spawn_webhook_enabled', True):
-                                self.app.webhook_manager.send_fruit_spawn(fruit_name)
-                except Exception as spawn_error:
-                    print(f"⚠️ Spawn check error: {spawn_error}")
             
             # Get drop layout area
             drop_area = self.app.layout_manager.get_layout_area('drop')

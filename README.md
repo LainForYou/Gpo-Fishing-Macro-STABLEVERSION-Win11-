@@ -12,6 +12,7 @@ This is the **open-source version** of the GPO fishing macro that everyone uses.
 - ✅ **No viruses** - Clean, transparent, and safe
 - ✅ **Improved** - Better features and reliability
 - ✅ **Community-driven** - Open for contributions and review
+- ✅ **Cross-platform** - Works on Windows, macOS, and Linux
 
 The original closed-source macro is sketchy and often flagged by antivirus software because you can't verify what it's actually doing. This open-source version solves that problem.
 
@@ -73,39 +74,147 @@ The original closed-source macro is sketchy and often flagged by antivirus softw
 - ✅ **Recommended**: Python 3.13.0 (most stable)
 - ✅ **Alternative**: Python 3.12.7
 
-**Download Links:**
+### 🪟 Windows Installation
+
+**Download Python:**
 
 - [Python 3.13.0](https://www.python.org/ftp/python/3.13.0/python-3.13.0-amd64.exe) (Recommended)
 - [Python 3.12.7](https://www.python.org/ftp/python/3.12.7/python-3.12.7-amd64.exe) (Alternative)
 
-### 🚀 Easy Installation (Recommended)
+**Easy Installation:**
 
 1. **Install Python 3.12 or 3.13** (see links above) - Make sure to check "Add Python to PATH"
 2. **Download the repository** as ZIP and extract it
-3. **Double-click `install.bat`** - This will:
+3. **Double-click `installers\windows\install.bat`** - This will:
    - Check if Python is installed and verify version compatibility
    - Install all required packages automatically
    - Set everything up for you
 4. **Run the application:**
-   - **Standard mode:** Double-click `run.bat` (silent, no console)
-   - **Dev mode:** Double-click `run_dev.bat` (with console for debugging)
+   - **Standard mode:** Double-click `installers\windows\run.bat` (silent, no console)
+   - **Dev mode:** Double-click `installers\windows\run_dev.bat` (with console for debugging)
 
-### 🔧 Manual Installation
+**Note:** For backward compatibility, the old `install.bat`, `run.bat`, and `run_dev.bat` files still work in the root directory.
 
-1. **Install Python 3.12 or 3.13** from the links above (check "Add to PATH")
-   - ⚠️ **Do NOT use Python 3.14+** - it will cause installation failures
+### 🍎 macOS Installation
+
+**Install Python:**
+
+```bash
+# Using Homebrew (recommended)
+brew install python@3.12
+
+# Or download from python.org
+```
+
+**Easy Installation:**
+
+1. **Download the repository** and extract it
+2. **Open Terminal** and navigate to the folder:
+   ```bash
+   cd path/to/gpo-fishing
+   ```
+3. **Make scripts executable:**
+   ```bash
+   chmod +x installers/mac/install.sh
+   chmod +x installers/mac/run.sh
+   chmod +x installers/mac/run_dev.sh
+   ```
+4. **Run installation:**
+   ```bash
+   ./installers/mac/install.sh
+   ```
+5. **Run the application:**
+   - **Standard mode:** `./installers/mac/run.sh`
+   - **Dev mode:** `./installers/mac/run_dev.sh`
+
+**Important Notes for macOS:**
+
+- You may need to grant **Accessibility permissions** for keyboard/mouse control
+- Go to: System Preferences → Security & Privacy → Privacy → Accessibility
+- Add Terminal or Python to the allowed apps list
+
+### 🐧 Linux Installation
+
+**Install Python:**
+
+```bash
+# Ubuntu/Debian
+sudo apt update
+sudo apt install python3.12 python3-pip python3-tk python3-dev
+
+# Fedora
+sudo dnf install python3.12 python3-pip python3-tkinter python3-devel
+
+# Arch
+sudo pacman -S python python-pip tk
+```
+
+**Easy Installation:**
+
+1. **Download the repository** and extract it
+2. **Open Terminal** and navigate to the folder:
+   ```bash
+   cd path/to/gpo-fishing
+   ```
+3. **Make scripts executable:**
+   ```bash
+   chmod +x installers/linux/install.sh
+   chmod +x installers/linux/run.sh
+   chmod +x installers/linux/run_dev.sh
+   ```
+4. **Run installation:**
+   ```bash
+   ./installers/linux/install.sh
+   ```
+5. **Run the application:**
+   - **Standard mode:** `./installers/linux/run.sh`
+   - **Dev mode:** `./installers/linux/run_dev.sh`
+
+**Additional Linux Dependencies:**
+
+```bash
+# Ubuntu/Debian - for OpenCV and screenshot support
+sudo apt install libgl1-mesa-glx libglib2.0-0 scrot
+
+# Note: keyboard library may require sudo privileges for global hotkeys
+```
+
+### 🔧 Manual Installation (All Platforms)
+
+1. **Install Python 3.12 or 3.13**
+
+   - Windows: Download from links above
+   - macOS: `brew install python@3.12`
+   - Linux: Use your package manager
+
 2. **Clone or download this repository**
+
    ```bash
    git clone https://github.com/arielldev/gpo-autofish.git
    cd gpo-autofish
    ```
-3. **Install packages**
+
+3. **Install platform-specific requirements**
+
    ```bash
-   pip install -r requirements.txt
+   # Windows
+   pip install -r requirements-windows.txt
+
+   # macOS
+   pip3 install -r requirements-mac.txt
+
+   # Linux
+   pip3 install -r requirements-linux.txt
    ```
+
 4. **Run the application**
+
    ```bash
+   # Windows
    python src/main.py
+
+   # macOS/Linux
+   python3 src/main.py
    ```
 
 ## 🎮 Quick Start Guide
