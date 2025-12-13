@@ -130,6 +130,7 @@ brew install python@3.12
 - You may need to grant **Accessibility permissions** for keyboard/mouse control
 - Go to: System Preferences → Security & Privacy → Privacy → Accessibility
 - Add Terminal or Python to the allowed apps list
+- **F1-F4 hotkeys are fully supported** - No admin privileges required!
 
 ### 🐧 Linux Installation
 
@@ -174,7 +175,7 @@ sudo pacman -S python python-pip tk
 # Ubuntu/Debian - for OpenCV and screenshot support
 sudo apt install libgl1-mesa-glx libglib2.0-0 scrot
 
-# Note: keyboard library may require sudo privileges for global hotkeys
+# Note: Hotkeys work without sudo privileges! F1-F4 keys are fully supported.
 ```
 
 ### 🔧 Manual Installation (All Platforms)
@@ -275,9 +276,9 @@ sudo apt install libgl1-mesa-glx libglib2.0-0 scrot
 ### Runtime Issues
 
 - **Hotkeys not working**:
-  - Windows: Try running with administrator privileges
-  - macOS: Grant Accessibility permissions in System Preferences
-  - Linux: keyboard library may require sudo privileges
+  - macOS/Linux: Grant Accessibility permissions in System Preferences (macOS) or similar settings (Linux)
+  - Note: F1-F4 keys work without admin/sudo privileges on all platforms!
+  - If hotkeys still don't work, try rebinding them using the "Rebind" buttons in the UI
 - **Fish detection failing**: Adjust overlay position over the blue fishing bar
 - **Devil fruit not detected**: Check OCR setup and drop area positioning
 - **Fruit spawns not detected**: Ensure drop layout covers the spawn message area

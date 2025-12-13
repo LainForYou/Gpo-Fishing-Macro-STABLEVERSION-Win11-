@@ -2,8 +2,8 @@ import threading
 import time
 import mss
 import numpy as np
-import keyboard
 from platform_adapter import mouse
+from platform_adapter import keyboard as platform_keyboard
 
 class FishingBot:
     def __init__(self, app):
@@ -276,7 +276,7 @@ class FishingBot:
             
             # Step 1: Press the configured fruit storage key
             print(f"📦 Step 1: Pressing fruit storage key '{fruit_key}'")
-            keyboard.press_and_release(fruit_key)
+            platform_keyboard.press_and_release(fruit_key)
             time.sleep(0.5)  # Increased delay for inventory to fully open
             
             # Step 2: Click at the configured fruit point
@@ -295,7 +295,7 @@ class FishingBot:
             
             # Step 2.6: Drop fruit with backspace (fallback)
             print(f"⬇️ Step 2.6: Dropping fruit with backspace...")
-            keyboard.press_and_release('backspace')
+            platform_keyboard.press_and_release('backspace')
             time.sleep(1.0)  # Increased wait for drop animation to complete
             
             # Step 3: Ensure proper rod equipping (single press only)
@@ -306,7 +306,7 @@ class FishingBot:
             
             # Single rod key press - pressing twice cycles through items!
             print(f"🎣 Step 3: Pressing rod key '{rod_key}' once")
-            keyboard.press_and_release(rod_key)
+            platform_keyboard.press_and_release(rod_key)
             time.sleep(0.8)  # Extended wait for rod to be fully equipped
             
             # Step 4: Click at the configured bait point
@@ -395,7 +395,7 @@ class FishingBot:
         
         # Purchase sequence with state tracking
         self.app.set_recovery_state("menu_opening", {"action": "pressing_e_key"})
-        keyboard.press_and_release('e')
+        platform_keyboard.press_and_release('e')
         time.sleep(self.app.purchase_delay_after_key)
         
         if not self.app.main_loop_active:
@@ -418,14 +418,14 @@ class FishingBot:
         
         self.app.set_recovery_state("typing", {"action": "typing_amount"})
         # Clear field first, then type amount more slowly
-        keyboard.press_and_release('ctrl+a')
+        platform_keyboard.press_and_release('ctrl+a')
         time.sleep(0.1)
-        keyboard.press_and_release('delete')
+        platform_keyboard.press_and_release('delete')
         time.sleep(0.1)
         
         # Type each character with small delay for reliability
         for char in amount:
-            keyboard.write(char)
+            platform_keyboard.write(char)
             time.sleep(0.05)
         
         # Extra delay to ensure typing is complete

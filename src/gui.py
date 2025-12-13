@@ -1,7 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, simpledialog
 import threading
-import keyboard
 from pynput import keyboard as pynput_keyboard
 from pynput import mouse as pynput_mouse
 from tkinter import messagebox
@@ -14,6 +13,7 @@ import os
 import time
 from datetime import datetime
 from platform_adapter import mouse as platform_mouse
+from platform_adapter import keyboard as platform_keyboard
 # Tray functionality removed - F4 now minimizes to taskbar
 
 try:
@@ -803,7 +803,7 @@ Sequence (per user spec):
         # Press 'e' key with detailed state tracking
         self.set_recovery_state("menu_opening", {"action": "pressing_e_key", "amount": amount})
         self.log('Pressing E key...', "verbose")
-        keyboard.press_and_release('e')
+        platform_keyboard.press_and_release('e')
         threading.Event().wait(self.purchase_delay_after_key)
         
         if not self.main_loop_active:
@@ -839,7 +839,7 @@ Sequence (per user spec):
         self.set_recovery_state("typing", {"action": "typing_amount", "amount": amount})
         self.log(f'Typing amount: {amount}', "verbose")
         # Type amount
-        keyboard.write(amount)
+        platform_keyboard.write(amount)
         # Extra delay to ensure typing is complete
         threading.Event().wait(self.purchase_after_type_delay + 0.5)
         
@@ -941,11 +941,11 @@ Sequence (per user spec):
     def register_hotkeys(self):
         """Register all hotkeys"""  # inserted
         try:
-            keyboard.unhook_all()
-            keyboard.add_hotkey(self.hotkeys['toggle_loop'], self.toggle_main_loop)
-            keyboard.add_hotkey(self.hotkeys['toggle_layout'], self.toggle_layout)
-            keyboard.add_hotkey(self.hotkeys['exit'], self.exit_app)
-            keyboard.add_hotkey(self.hotkeys['toggle_minimize'], self.toggle_minimize_hotkey)
+            platform_keyboard.unhook_all()
+            platform_keyboard.add_hotkey(self.hotkeys['toggle_loop'], self.toggle_main_loop)
+            platform_keyboard.add_hotkey(self.hotkeys['toggle_layout'], self.toggle_layout)
+            platform_keyboard.add_hotkey(self.hotkeys['exit'], self.exit_app)
+            platform_keyboard.add_hotkey(self.hotkeys['toggle_minimize'], self.toggle_minimize_hotkey)
             print(f"✅ Hotkeys registered: {self.hotkeys}")
         except Exception as e:
             print(f'❌ Error registering hotkeys: {e}')
@@ -1290,7 +1290,7 @@ Sequence (per user spec):
 
         # Unhook all keyboard events
         try:
-            keyboard.unhook_all()
+            platform_keyboard.unhook_all()
         except Exception:
             pass
 

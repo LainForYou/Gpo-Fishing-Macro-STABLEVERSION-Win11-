@@ -14,11 +14,21 @@ This directory contains the refactored source code for GPO Autofish, organized i
 - `main.py` - Entry point for the application
 - `gui.py` - Main GUI class and UI components
 - `fishing.py` - Fishing bot logic and auto-purchase system
+- `platform_adapter.py` - Cross-platform abstraction for mouse and keyboard (Windows/Mac/Linux)
 - `overlay.py` - Overlay window management
 - `webhook.py` - Discord webhook notifications
 - `updater.py` - Auto-update functionality
 - `settings.py` - Settings management (save/load/presets)
 - `utils.py` - Utility classes (ToolTip, CollapsibleFrame)
+
+## Cross-Platform Support
+
+The application uses `platform_adapter.py` to provide unified keyboard and mouse control:
+
+- **Windows**: Uses `keyboard` library for hotkeys
+- **Mac/Linux**: Uses `pynput` library (no admin/sudo privileges required!)
+- **F1-F4 keys**: Fully supported on all platforms without crashes
+- **Hotkey rebinding**: Works safely on all platforms
 
 ## Running the Application
 

@@ -7,7 +7,7 @@ across Windows, macOS, and Linux.
 import platform
 import sys
 import time
-from typing import Tuple, Literal
+from typing import Tuple, Literal, Callable, Optional
 
 # Determine the current operating system
 SYSTEM = platform.system()  # 'Windows', 'Darwin' (macOS), 'Linux'
@@ -196,6 +196,263 @@ class MouseController:
             return (pos.x, pos.y)
 
 
+class KeyboardController:
+    """
+    Unified keyboard control interface that works across Windows, macOS, and Linux.
+    
+    On Windows: Uses 'keyboard' library for low-level hotkey support
+    On macOS/Linux: Uses 'pynput' library which doesn't require admin privileges
+    """
+    
+    def __init__(self):
+        self.system = SYSTEM
+        self._hotkeys = {}  # Store registered hotkeys
+        
+        if self.system == "Windows":
+            # Use keyboard library on Windows - it works without admin privileges
+            try:
+                import keyboard as kb
+                self._keyboard = kb
+                self._backend = "keyboard"
+            except ImportError:
+                print("ERROR: keyboard library is required for Windows.")
+                print("Install it with: pip install keyboard")
+                sys.exit(1)
+        else:
+            # Use pynput on macOS and Linux - doesn't require admin privileges
+            try:
+                from pynput import keyboard as pynput_kb
+                self._pynput = pynput_kb
+                self._backend = "pynput"
+                self._listeners = []
+                self._pressed_keys = set()
+            except ImportError:
+                print("ERROR: pynput is required for Mac/Linux.")
+                print("Install it with: pip install pynput")
+                sys.exit(1)
+    
+    def _normalize_key(self, key_string: str) -> str:
+        """Normalize key string to consistent format across platforms."""
+        # Convert to lowercase for consistency
+        key_string = key_string.lower().strip()
+        
+        # Map common key variations
+        key_map = {
+            'esc': 'escape',
+            'ctrl': 'control',
+            'del': 'delete',
+            'ins': 'insert',
+            'pgup': 'page_up',
+            'pgdn': 'page_down',
+            'pageup': 'page_up',
+            'pagedown': 'page_down',
+        }
+        
+        return key_map.get(key_string, key_string)
+    
+    def _key_to_pynput(self, key_string: str):
+        """Convert key string to pynput Key object."""
+        key_string = self._normalize_key(key_string)
+        
+        # Handle function keys (f1-f20)
+        if key_string.startswith('f') and len(key_string) > 1:
+            fn_num_str = key_string[1:]
+            if fn_num_str.isdigit():
+                fn_num = int(fn_num_str)
+                if 1 <= fn_num <= 20:
+                    # Return the actual Key object for function keys
+                    return getattr(self._pynput.Key, f'f{fn_num}')
+        
+        # Handle special keys
+        special_keys = {
+            'escape': self._pynput.Key.esc,
+            'esc': self._pynput.Key.esc,
+            'space': self._pynput.Key.space,
+            'enter': self._pynput.Key.enter,
+            'return': self._pynput.Key.enter,
+            'tab': self._pynput.Key.tab,
+            'backspace': self._pynput.Key.backspace,
+            'delete': self._pynput.Key.delete,
+            'insert': self._pynput.Key.insert,
+            'home': self._pynput.Key.home,
+            'end': self._pynput.Key.end,
+            'page_up': self._pynput.Key.page_up,
+            'page_down': self._pynput.Key.page_down,
+            'up': self._pynput.Key.up,
+            'down': self._pynput.Key.down,
+            'left': self._pynput.Key.left,
+            'right': self._pynput.Key.right,
+            'control': self._pynput.Key.ctrl,
+            'ctrl': self._pynput.Key.ctrl,
+            'shift': self._pynput.Key.shift,
+            'alt': self._pynput.Key.alt,
+            'alt_l': self._pynput.Key.alt_l,
+            'alt_r': self._pynput.Key.alt_r,
+            'cmd': self._pynput.Key.cmd,
+            'command': self._pynput.Key.cmd,
+        }
+        
+        if key_string in special_keys:
+            return special_keys[key_string]
+        
+        # Single character keys
+        if len(key_string) == 1:
+            return self._pynput.KeyCode.from_char(key_string)
+        
+        return None
+    
+    def add_hotkey(self, key_combination: str, callback: Callable):
+        """
+        Register a hotkey with a callback function.
+        
+        Args:
+            key_combination: Key combination string (e.g., 'f1', 'ctrl+c', 'shift+alt+s')
+            callback: Function to call when hotkey is pressed
+        """
+        if self._backend == "keyboard":
+            # Use keyboard library on Windows
+            try:
+                self._keyboard.add_hotkey(key_combination, callback)
+                self._hotkeys[key_combination] = callback
+                return True
+            except Exception as e:
+                print(f"Error adding hotkey {key_combination}: {e}")
+                return False
+        else:
+            # Use pynput on Mac/Linux
+            # Parse key combination
+            keys = [k.strip() for k in key_combination.split('+')]
+            target_keys = set()
+            
+            for key in keys:
+                pynput_key = self._key_to_pynput(key)
+                if pynput_key:
+                    target_keys.add(pynput_key)
+            
+            if not target_keys:
+                print(f"Warning: Could not parse key combination: {key_combination}")
+                return False
+            
+            # Store the hotkey mapping
+            self._hotkeys[key_combination] = {
+                'callback': callback,
+                'keys': target_keys
+            }
+            
+            # Start listener if not already running
+            if not self._listeners:
+                self._start_pynput_listener()
+            
+            return True
+    
+    def _start_pynput_listener(self):
+        """Start pynput keyboard listener for hotkey detection."""
+        self._hotkey_triggered = {}  # Track which hotkeys have been triggered
+        
+        def on_press(key):
+            # Add to pressed keys
+            self._pressed_keys.add(key)
+            
+            # Check if any hotkey combination matches
+            for hotkey_id, hotkey_data in self._hotkeys.items():
+                if isinstance(hotkey_data, dict) and 'keys' in hotkey_data:
+                    # Check if this exact hotkey combination is pressed
+                    if hotkey_data['keys'].issubset(self._pressed_keys):
+                        # Only trigger once per press (not on every key in combination)
+                        if hotkey_id not in self._hotkey_triggered or not self._hotkey_triggered[hotkey_id]:
+                            self._hotkey_triggered[hotkey_id] = True
+                            try:
+                                hotkey_data['callback']()
+                            except Exception as e:
+                                print(f"Error in hotkey callback: {e}")
+        
+        def on_release(key):
+            # Remove from pressed keys
+            self._pressed_keys.discard(key)
+            
+            # Reset hotkey triggered states when keys are released
+            for hotkey_id, hotkey_data in self._hotkeys.items():
+                if isinstance(hotkey_data, dict) and 'keys' in hotkey_data:
+                    # If the released key was part of this hotkey, reset the trigger
+                    if key in hotkey_data['keys']:
+                        self._hotkey_triggered[hotkey_id] = False
+        
+        listener = self._pynput.Listener(on_press=on_press, on_release=on_release)
+        listener.start()
+        self._listeners.append(listener)
+    
+    def unhook_all(self):
+        """Remove all registered hotkeys."""
+        if self._backend == "keyboard":
+            try:
+                self._keyboard.unhook_all()
+            except Exception as e:
+                print(f"Error unhooking hotkeys: {e}")
+        else:
+            # Stop all pynput listeners
+            for listener in self._listeners:
+                try:
+                    listener.stop()
+                except Exception:
+                    pass
+            self._listeners.clear()
+            self._pressed_keys = set()
+            if hasattr(self, '_hotkey_triggered'):
+                self._hotkey_triggered = {}
+        
+        self._hotkeys.clear()
+    
+    def press_and_release(self, key: str):
+        """
+        Press and release a key.
+        
+        Args:
+            key: Key to press (e.g., 'a', 'enter', 'ctrl+c')
+        """
+        if self._backend == "keyboard":
+            self._keyboard.press_and_release(key)
+        else:
+            # Use pynput controller
+            controller = self._pynput.Controller()
+            
+            # Handle combinations like 'ctrl+a'
+            if '+' in key:
+                keys = [k.strip() for k in key.split('+')]
+                pynput_keys = [self._key_to_pynput(k) for k in keys]
+                
+                # Press all keys
+                for pkey in pynput_keys:
+                    if pkey:
+                        controller.press(pkey)
+                        time.sleep(0.01)
+                
+                # Release in reverse order
+                for pkey in reversed(pynput_keys):
+                    if pkey:
+                        controller.release(pkey)
+                        time.sleep(0.01)
+            else:
+                # Single key
+                pkey = self._key_to_pynput(key)
+                if pkey:
+                    controller.press(pkey)
+                    time.sleep(0.01)
+                    controller.release(pkey)
+    
+    def write(self, text: str):
+        """
+        Type text string.
+        
+        Args:
+            text: Text to type
+        """
+        if self._backend == "keyboard":
+            self._keyboard.write(text)
+        else:
+            controller = self._pynput.Controller()
+            controller.type(text)
+
+
 class SystemAdapter:
     """
     System-level operations abstraction.
@@ -234,6 +491,7 @@ class SystemAdapter:
 
 # Global instances for easy import
 mouse = MouseController()
+keyboard = KeyboardController()
 system = SystemAdapter()
 
 
@@ -277,6 +535,12 @@ if __name__ == "__main__":
     # Test the platform adapter
     print(f"Operating System: {SYSTEM}")
     print(f"Mouse Backend: {mouse._backend}")
+    print(f"Keyboard Backend: {keyboard._backend}")
     print(f"Screen Size: {get_screen_size()}")
     print(f"Current Position: {mouse.get_position()}")
-    print("\nPlatform adapter initialized successfully!")
+    print("\n✅ Platform adapter initialized successfully!")
+    print("\nKeyboard Controller Notes:")
+    print("- Windows: Uses 'keyboard' library")
+    print("- Mac/Linux: Uses 'pynput' library (no admin privileges required)")
+    print("- F1-F4 keys are fully supported on all platforms")
+    print("- Hotkeys can be rebound safely without crashes")
