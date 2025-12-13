@@ -265,7 +265,6 @@ class FishingBot:
             return
             
         try:
-            import keyboard
             import time
             
             # Get configured keys from GUI settings
@@ -332,8 +331,6 @@ class FishingBot:
     def move_to_fishing_position(self):
         """Move mouse to fishing position (custom or default center-top)"""
         try:
-            import win32api
-            import win32gui
             import time
             
             # Use custom fishing location if set, otherwise use default

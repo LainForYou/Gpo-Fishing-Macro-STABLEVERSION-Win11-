@@ -9,13 +9,12 @@ import logging
 from typing import Optional, Dict, Tuple
 
 try:
-    import keyboard
     import mss
     import numpy as np
     BAIT_AVAILABLE = True
 except ImportError:
     BAIT_AVAILABLE = False
-    print("❌ Bait management requires keyboard, mss, and numpy")
+    print("❌ Bait management requires mss and numpy")
 
 class BaitManager:
     """Manages automatic bait selection - simplified to just select top bait"""
