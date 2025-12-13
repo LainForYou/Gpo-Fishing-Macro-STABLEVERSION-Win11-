@@ -1,6 +1,6 @@
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-7289da?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/unPZxXAtfb)
 
-# 🎣 GPO Autofish - GUIDE
+# 🎣 GPO Autofish - GUIDE (Windows, macOS, Linux)
 
 **💬 Join our Discord server:** https://discord.gg/unPZxXAtfb
 
@@ -92,8 +92,6 @@ The original closed-source macro is sketchy and often flagged by antivirus softw
 4. **Run the application:**
    - **Standard mode:** Double-click `installers\windows\run.bat` (silent, no console)
    - **Dev mode:** Double-click `installers\windows\run_dev.bat` (with console for debugging)
-
-**Note:** For backward compatibility, the old `install.bat`, `run.bat`, and `run_dev.bat` files still work in the root directory.
 
 ### 🍎 macOS Installation
 
@@ -221,8 +219,8 @@ sudo apt install libgl1-mesa-glx libglib2.0-0 scrot
 
 ### First Time Setup
 
-1. **Install**: Run `install.bat` to set everything up automatically
-2. **Launch**: Use `run.bat` (silent mode) or `run_dev.bat` (with console for debugging)
+1. **Install**: Navigate to `installers/<your-platform>/` and run the install script
+2. **Launch**: Use `run.bat` / `run.sh` (silent mode) or `run_dev.bat` / `run_dev.sh` (with console for debugging)
 3. **Configure Layouts**: Position overlays over fishing bar and drop detection areas
 4. **Set Points**: Configure fruit storage points and auto-purchase coordinates
 5. **Enable Features**: Turn on devil fruit storage, webhooks, and auto-purchase as needed
@@ -256,8 +254,8 @@ sudo apt install libgl1-mesa-glx libglib2.0-0 scrot
 
 ### Performance Tips
 
-- **Long Sessions**: Use `run.bat` for extended fishing sessions (runs silently in background)
-- **Debugging**: Use `run_dev.bat` when you need to see console output or troubleshoot issues
+- **Long Sessions**: Use `run.bat` / `run.sh` for extended fishing sessions (runs silently in background)
+- **Debugging**: Use `run_dev.bat` / `run_dev.sh` when you need to see console output or troubleshoot issues
 - **Webhook Monitoring**: Use Discord alerts for fruit spawns and catches instead of watching console
 - **OCR Optimization**: Ensure good lighting and clear text for better fruit detection
 - **Spawn Detection**: The bot detects all 33 GPO devil fruits automatically using fuzzy matching
@@ -276,12 +274,15 @@ sudo apt install libgl1-mesa-glx libglib2.0-0 scrot
 
 ### Runtime Issues
 
-- **Hotkeys not working**: Try running with administrator privileges
+- **Hotkeys not working**:
+  - Windows: Try running with administrator privileges
+  - macOS: Grant Accessibility permissions in System Preferences
+  - Linux: keyboard library may require sudo privileges
 - **Fish detection failing**: Adjust overlay position over the blue fishing bar
 - **Devil fruit not detected**: Check OCR setup and drop area positioning
 - **Fruit spawns not detected**: Ensure drop layout covers the spawn message area
 - **Auto-purchase failing**: Verify all 4 purchase points are set correctly
-- **High CPU usage**: Use `run.bat` for silent mode operation
+- **High CPU usage**: Use `run.bat` / `run.sh` for silent mode operation
 
 ### Devil Fruit Issues
 
@@ -292,9 +293,9 @@ sudo apt install libgl1-mesa-glx libglib2.0-0 scrot
 
 ### Performance Issues
 
-- **Long sessions lagging**: Use `run.bat` for silent background operation
-- **Need console output**: Use `run_dev.bat` for debugging mode with full logging
-- **Memory usage**: Standard mode (`run.bat`) automatically reduces memory footprint
+- **Long sessions lagging**: Use `run.bat` / `run.sh` for silent background operation
+- **Need console output**: Use `run_dev.bat` / `run_dev.sh` for debugging mode with full logging
+- **Memory usage**: Standard mode automatically reduces memory footprint
 - **OCR slow**: Install EasyOCR properly for faster text recognition
 - **Spawn detection**: Works automatically for all 33 GPO fruits with fuzzy name matching
 
@@ -306,7 +307,7 @@ The codebase has been refactored into a clean, modular structure:
 
 ```
 src/
-├── main.py              # Application entry poi
+├── main.py              # Application entry point
 ├── gui.py               # Main GUI and UI components
 ├── fishing.py           # Fishing bot logic and devil fruit detection
 ├── overlay.py           # Overlay window management
@@ -317,7 +318,14 @@ src/
 ├── updater.py           # Auto-update system
 ├── settings.py          # Settings management
 ├── themes.py            # Theme system for UI customization
+├── platform_adapter.py  # Cross-platform mouse/system abstraction
+├── bait_manager.py      # Bait purchasing and inventory management
 └── utils.py             # Utility classes
+
+installers/
+├── windows/             # Windows installation scripts (.bat)
+├── mac/                 # macOS installation scripts (.sh)
+└── linux/               # Linux installation scripts (.sh)
 ```
 
 This modular structure makes the code:
