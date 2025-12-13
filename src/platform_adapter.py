@@ -263,7 +263,7 @@ class KeyboardController:
                     # Return the actual Key object for function keys
                     return getattr(self._pynput.Key, f'f{fn_num}')
         
-        # Handle special keys
+        # Handle special keys - build dynamically to handle Mac/Linux differences
         special_keys = {
             'escape': self._pynput.Key.esc,
             'esc': self._pynput.Key.esc,
@@ -272,12 +272,6 @@ class KeyboardController:
             'return': self._pynput.Key.enter,
             'tab': self._pynput.Key.tab,
             'backspace': self._pynput.Key.backspace,
-            'delete': self._pynput.Key.delete,
-            'insert': self._pynput.Key.insert,
-            'home': self._pynput.Key.home,
-            'end': self._pynput.Key.end,
-            'page_up': self._pynput.Key.page_up,
-            'page_down': self._pynput.Key.page_down,
             'up': self._pynput.Key.up,
             'down': self._pynput.Key.down,
             'left': self._pynput.Key.left,
@@ -286,11 +280,29 @@ class KeyboardController:
             'ctrl': self._pynput.Key.ctrl,
             'shift': self._pynput.Key.shift,
             'alt': self._pynput.Key.alt,
-            'alt_l': self._pynput.Key.alt_l,
-            'alt_r': self._pynput.Key.alt_r,
-            'cmd': self._pynput.Key.cmd,
-            'command': self._pynput.Key.cmd,
         }
+        
+        # Add keys that may not exist on all platforms (e.g., Insert not on Mac)
+        optional_keys = {
+            'delete': 'delete',
+            'insert': 'insert',
+            'home': 'home',
+            'end': 'end',
+            'page_up': 'page_up',
+            'page_down': 'page_down',
+            'alt_l': 'alt_l',
+            'alt_r': 'alt_r',
+            'cmd': 'cmd',
+            'command': 'cmd',
+        }
+        
+        for key_name, attr_name in optional_keys.items():
+            try:
+                key_attr = getattr(self._pynput.Key, attr_name, None)
+                if key_attr is not None:
+                    special_keys[key_name] = key_attr
+            except AttributeError:
+                pass  # Key not available on this platform
         
         if key_string in special_keys:
             return special_keys[key_string]
