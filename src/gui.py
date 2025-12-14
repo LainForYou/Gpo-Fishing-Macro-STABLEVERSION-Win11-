@@ -1117,24 +1117,25 @@ Sequence (per user spec):
         # Update UI
         self.loop_status.config(text='● Main Loop: ACTIVE', style='StatusOn.TLabel')
         
-        # Start the loop with smart detection
+        # Start the loop with detection
         self.main_loop_thread = threading.Thread(target=self.smart_resume_loop, daemon=True)
         self.main_loop_thread.start()
         
         # Resume runtime timer
         self.update_runtime_timer()
         
-        self.log('▶️ Fishing resumed with smart detection', "important")
+        self.log('▶️ Fishing resumed', "important")
     
     def smart_resume_loop(self):
-        """Resume loop with smart detection of current state"""
-        import mss
-        import numpy as np
-        
-        # Check if there's already a blue fishing bar visible
-        target_color = (85, 170, 255)
-        
-        with mss.mss() as sct:
+        """Resume loop with detection of current state"""
+        try:
+            import mss
+            import numpy as np
+            
+            # Check if there's already a blue fishing bar visible
+            target_color = (85, 170, 255)
+            
+            with mss.mss() as sct:
             # Use current layout area for screenshot
             current_area = self.layout_manager.get_layout_area(self.layout_manager.current_layout)
             if not current_area:
@@ -1158,14 +1159,26 @@ Sequence (per user spec):
                 if blue_found:
                     break
         
-        if blue_found:
-            self.log('🎯 Blue fishing bar detected - resuming from current state', "important")
-            # Jump directly into the main loop detection (skip initial setup)
-            self.fishing_bot.run_main_loop(skip_initial_setup=True)
-        else:
-            self.log('🎣 No fishing bar detected - starting fresh', "important")
-            # Start from scratch with auto-purchase check and casting
-            self.fishing_bot.run_main_loop(skip_initial_setup=False)
+            if blue_found:
+                self.log('🎯 Blue fishing bar detected - resuming from current state', "important")
+                # Jump directly into the main loop detection (skip initial setup)
+                self.fishing_bot.run_main_loop(skip_initial_setup=True)
+            else:
+                self.log('🎣 No fishing bar detected - starting fresh', "important")
+                # Start from scratch with auto-purchase check and casting
+                self.fishing_bot.run_main_loop(skip_initial_setup=False)
+        except Exception as e:
+            print(f"❌ RESUME ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+            # Fall back to starting fresh
+            self.log('⚠️ Detection failed - starting fresh', "error")
+            try:
+                self.fishing_bot.run_main_loop(skip_initial_setup=False)
+            except Exception as e2:
+                print(f"❌ FALLBACK START ERROR: {e2}")
+                traceback.print_exc()
+                self.main_loop_active = False
 
     def increment_fish_counter(self):
         """Increment fish counter and update display"""
@@ -1223,16 +1236,29 @@ Sequence (per user spec):
 
     def cast_line(self):
         """Perform the casting action: hold click for 1 second then release"""
-        self.log('Casting line...', "verbose")
-        platform_mouse.mouse_down('left')
-        threading.Event().wait(1.0)
-        platform_mouse.mouse_up('left')
-        self.is_clicking = False
-        
-        # Update activity tracking
-        self.last_activity_time = time.time()
-        
-        self.log('Line cast', "verbose")
+        try:
+            self.log('Casting line...', "verbose")
+            from platform_adapter import mouse
+            mouse.mouse_down('left')
+            time.sleep(1.0)  # More reliable than threading.Event().wait()
+            mouse.mouse_up('left')
+            self.is_clicking = False
+            
+            # Update activity tracking
+            self.last_activity_time = time.time()
+            
+            self.log('Line cast', "verbose")
+        except Exception as e:
+            print(f"❌ CAST ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+            # Ensure mouse is released
+            try:
+                from platform_adapter import mouse
+                mouse.mouse_up('left')
+            except:
+                pass
+            self.is_clicking = False
 
     def main_loop(self):
         """Main loop that runs when activated - delegates to fishing bot"""

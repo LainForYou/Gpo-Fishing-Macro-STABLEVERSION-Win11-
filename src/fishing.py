@@ -629,8 +629,12 @@ class FishingBot:
         }
     
     def run_main_loop(self, skip_initial_setup=False):
-        """Main fishing loop with enhanced smart detection and control"""
-        print('🎣 Main loop started with enhanced smart detection')
+        """Main fishing loop with enhanced detection and control"""
+        import platform
+        import traceback
+        
+        system = platform.system()
+        print(f'🎣 Main loop started on {system}')
         target_color = (85, 170, 255)
         dark_color = (25, 25, 25)
         white_color = (255, 255, 255)
@@ -645,10 +649,20 @@ class FishingBot:
             self.app.recovery_count = 0
         
         try:
+            print("📸 Initializing screen capture...")
             with mss.mss() as sct:
+                print("✅ Screen capture initialized")
+                
                 # Initial setup sequence (skip if resuming)
                 if not skip_initial_setup:
-                    self.perform_initial_setup()
+                    print("🔧 Running initial setup...")
+                    try:
+                        self.perform_initial_setup()
+                        print("✅ Initial setup complete")
+                    except Exception as setup_error:
+                        print(f"❌ SETUP ERROR: {setup_error}")
+                        traceback.print_exc()
+                        raise
                 else:
                     print("🔧 Skipping initial setup - resuming from current state")
                 
@@ -970,6 +984,9 @@ class FishingBot:
                             break  # Exit immediately on force stop
         
         except Exception as e:
+            print(f'🚨 CRITICAL ERROR: {e}')
+            import traceback
+            traceback.print_exc()
             self.app.log(f'🚨 Critical main loop error: {e}', "error")
         
         finally:
@@ -977,18 +994,25 @@ class FishingBot:
             print('🛑 Main loop stopped - cleaning up')
             
             # Stop watchdog
-            self.stop_watchdog()
+            try:
+                self.stop_watchdog()
+            except Exception as e:
+                print(f"❌ Watchdog stop error: {e}")
             
             # Clean up mouse state
             if self.app.is_clicking:
                 try:
                     mouse.mouse_up('left')
                     self.app.is_clicking = False
+                    print("✅ Mouse released")
+                except Exception as e:
+                    print(f"❌ Mouse release error: {e}")
                 except:
                     pass
     
     def perform_initial_setup(self):
         """Perform initial setup: zoom out, specific zoom in, auto buy if enabled"""
+        import traceback
         print("🔧 Performing initial setup...")
         
         # Set state to prevent watchdog interference
@@ -998,55 +1022,70 @@ class FishingBot:
         self.update_heartbeat()
         
         # Step 1: Auto zoom (only if enabled)
-        auto_zoom_enabled = getattr(self.app, 'auto_zoom_var', None) and self.app.auto_zoom_var.get()
+        try:
+            auto_zoom_enabled = getattr(self.app, 'auto_zoom_var', None) and self.app.auto_zoom_var.get()
+        except Exception as e:
+            print(f"❌ Error checking zoom setting: {e}")
+            auto_zoom_enabled = False
         
         if auto_zoom_enabled:
-            if hasattr(self.app, 'zoom_controller'):
-                if self.app.zoom_controller.is_available():
-                    self.app.set_recovery_state("initial_setup", {"action": "zoom_out"})
-                    print("🔍 Step 1: Full zoom out...")
-                    success_out = self.app.zoom_controller.reset_zoom()
-                    print(f"Zoom out result: {success_out}")
-                    self.update_heartbeat()  # Update after zoom out
-                    time.sleep(1.0)  # Longer delay to ensure zoom completes
-                    
-                    # Step 2: Specific zoom in
-                    self.app.set_recovery_state("initial_setup", {"action": "zoom_in"})
-                    print("🔍 Step 2: Specific zoom in...")
-                    success_in = self.app.zoom_controller.zoom_in()
-                    print(f"Zoom in result: {success_in}")
-                    self.update_heartbeat()  # Update after zoom in
-                    time.sleep(1.0)  # Longer delay to ensure zoom completes
+            try:
+                if hasattr(self.app, 'zoom_controller'):
+                    if self.app.zoom_controller.is_available():
+                        self.app.set_recovery_state("initial_setup", {"action": "zoom_out"})
+                        print("🔍 Step 1: Full zoom out...")
+                        success_out = self.app.zoom_controller.reset_zoom()
+                        print(f"Zoom out result: {success_out}")
+                        self.update_heartbeat()
+                        time.sleep(1.0)
+                        
+                        # Step 2: Specific zoom in
+                        self.app.set_recovery_state("initial_setup", {"action": "zoom_in"})
+                        print("🔍 Step 2: Specific zoom in...")
+                        success_in = self.app.zoom_controller.zoom_in()
+                        print(f"Zoom in result: {success_in}")
+                        self.update_heartbeat()
+                        time.sleep(1.0)
+                    else:
+                        print("🔍 Zoom controller not available")
                 else:
-                    print("🔍 Zoom controller not available (missing pywin32)")
-            else:
-                print("🔍 Zoom controller not initialized")
+                    print("🔍 Zoom controller not initialized")
+            except Exception as e:
+                print(f"❌ Zoom error: {e}")
+                traceback.print_exc()
         else:
             print("🔍 Auto zoom disabled - skipping zoom sequence")
         
         # Step 3: Auto purchase if enabled
-        if getattr(self.app, 'auto_purchase_var', None) and self.app.auto_purchase_var.get():
-            print("🛒 Step 3: Auto purchase...")
-            self.app.set_recovery_state("purchasing", {"sequence": "initial_auto_purchase"})
-            self.perform_auto_purchase()
-            # Add delay after auto purchase to ensure it completes
-            time.sleep(1.0)
+        try:
+            if getattr(self.app, 'auto_purchase_var', None) and self.app.auto_purchase_var.get():
+                print("🛒 Step 3: Auto purchase...")
+                self.app.set_recovery_state("purchasing", {"sequence": "initial_auto_purchase"})
+                self.perform_auto_purchase()
+                time.sleep(1.0)
+        except Exception as e:
+            print(f"❌ Auto-purchase error: {e}")
+            traceback.print_exc()
         
-        # Step 4: Auto bait selection (when rod is in hand)
-        if hasattr(self.app, 'bait_manager') and self.app.bait_manager.is_enabled():
-            print("🎣 Step 4: Selecting initial bait...")
-            self.app.set_recovery_state("initial_setup", {"action": "bait_selection"})
-            self.app.bait_manager.select_bait_before_cast()
-            time.sleep(0.5)
+        # Step 4: Auto bait selection
+        try:
+            if hasattr(self.app, 'bait_manager') and self.app.bait_manager.is_enabled():
+                print("🎣 Step 4: Selecting initial bait...")
+                self.app.set_recovery_state("initial_setup", {"action": "bait_selection"})
+                self.app.bait_manager.select_bait_before_cast()
+                time.sleep(0.5)
+        except Exception as e:
+            print(f"❌ Bait selection error: {e}")
+            traceback.print_exc()
         
-        # Final delay to ensure all setup operations are complete before casting
+        # Final delay
         self.app.set_recovery_state("initial_setup", {"action": "finalizing"})
         print("⏳ Waiting for setup to stabilize...")
         time.sleep(1.5)
         
-        # Reset to idle state after setup is complete
+        # Reset to idle state
         self.app.set_recovery_state("idle", {"action": "setup_complete"})
-        self.update_heartbeat()  # Final heartbeat update
+        self.update_heartbeat()
         print("✅ Initial setup complete")
     
     def process_post_catch_workflow(self):
