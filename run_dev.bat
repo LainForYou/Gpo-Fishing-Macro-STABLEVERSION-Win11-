@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 title GPO Autofish - Development Mode
 color 0A
-cd /d "%~dp0\..\..\"
+cd /d "%~dp0"
 
 echo ========================================
 echo   GPO Autofish - Development Mode

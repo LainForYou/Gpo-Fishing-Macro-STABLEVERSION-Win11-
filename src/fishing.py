@@ -2,8 +2,9 @@ import threading
 import time
 import mss
 import numpy as np
-from platform_adapter import mouse
-from platform_adapter import keyboard as platform_keyboard
+import win32api
+import win32con
+import keyboard
 
 class FishingBot:
     def __init__(self, app):
@@ -13,8 +14,6 @@ class FishingBot:
         self.watchdog_thread = None
         self.last_loop_heartbeat = time.time()
         self.force_stop_flag = False
-        self.last_fruit_spawn_time = 0  # Track when last fruit spawn was detected
-        self.fruit_spawn_cooldown = 15 * 60  # 15 minutes cooldown after detecting spawn
     
     def check_recovery_needed(self):
         """Smart recovery check - detects genuinely stuck states"""
@@ -130,7 +129,7 @@ class FishingBot:
         # Clean up mouse state immediately
         try:
             if self.app.is_clicking:
-                mouse.mouse_up('left')
+                win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
                 self.app.is_clicking = False
         except:
             pass
@@ -193,7 +192,7 @@ class FishingBot:
         
         # Release mouse IMMEDIATELY
         try:
-            mouse.mouse_up('left')
+            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
             self.app.is_clicking = False
         except:
             pass
@@ -244,8 +243,9 @@ class FishingBot:
         
         # Right-click to clear any menus before casting
         try:
+            import win32api
             print(f"🖱️ Right-clicking at fishing position")
-            current_pos = mouse.get_position()
+            current_pos = win32api.GetCursorPos()
             self.app._right_click_at(current_pos)
             time.sleep(0.3)
         except Exception as e:
@@ -265,6 +265,7 @@ class FishingBot:
             return
             
         try:
+            import keyboard
             import time
             
             # Get configured keys from GUI settings
@@ -275,7 +276,7 @@ class FishingBot:
             
             # Step 1: Press the configured fruit storage key
             print(f"📦 Step 1: Pressing fruit storage key '{fruit_key}'")
-            platform_keyboard.press_and_release(fruit_key)
+            keyboard.press_and_release(fruit_key)
             time.sleep(0.5)  # Increased delay for inventory to fully open
             
             # Step 2: Click at the configured fruit point
@@ -294,7 +295,7 @@ class FishingBot:
             
             # Step 2.6: Drop fruit with backspace (fallback)
             print(f"⬇️ Step 2.6: Dropping fruit with backspace...")
-            platform_keyboard.press_and_release('backspace')
+            keyboard.press_and_release('backspace')
             time.sleep(1.0)  # Increased wait for drop animation to complete
             
             # Step 3: Ensure proper rod equipping (single press only)
@@ -305,7 +306,7 @@ class FishingBot:
             
             # Single rod key press - pressing twice cycles through items!
             print(f"🎣 Step 3: Pressing rod key '{rod_key}' once")
-            platform_keyboard.press_and_release(rod_key)
+            keyboard.press_and_release(rod_key)
             time.sleep(0.8)  # Extended wait for rod to be fully equipped
             
             # Step 4: Click at the configured bait point
@@ -331,6 +332,8 @@ class FishingBot:
     def move_to_fishing_position(self):
         """Move mouse to fishing position (custom or default center-top)"""
         try:
+            import win32api
+            import win32gui
             import time
             
             # Use custom fishing location if set, otherwise use default
@@ -339,13 +342,14 @@ class FishingBot:
                 print(f"🎯 Moving mouse to custom fishing position: ({fishing_x}, {fishing_y})")
             else:
                 # Fallback to default center-top position
-                screen_width, screen_height = mouse.get_screen_size()
+                screen_width = win32api.GetSystemMetrics(0)  # SM_CXSCREEN
+                screen_height = win32api.GetSystemMetrics(1)  # SM_CYSCREEN
                 fishing_x = screen_width // 2
                 fishing_y = screen_height // 3
                 print(f"🎯 Moving mouse to default fishing position: ({fishing_x}, {fishing_y})")
             
             # Only move mouse to position, don't click yet
-            mouse.move_to(fishing_x, fishing_y)
+            win32api.SetCursorPos((fishing_x, fishing_y))
             time.sleep(0.1)
             
         except Exception as e:
@@ -392,7 +396,7 @@ class FishingBot:
         
         # Purchase sequence with state tracking
         self.app.set_recovery_state("menu_opening", {"action": "pressing_e_key"})
-        platform_keyboard.press_and_release('e')
+        keyboard.press_and_release('e')
         time.sleep(self.app.purchase_delay_after_key)
         
         if not self.app.main_loop_active:
@@ -415,14 +419,14 @@ class FishingBot:
         
         self.app.set_recovery_state("typing", {"action": "typing_amount"})
         # Clear field first, then type amount more slowly
-        platform_keyboard.press_and_release('ctrl+a')
+        keyboard.press_and_release('ctrl+a')
         time.sleep(0.1)
-        platform_keyboard.press_and_release('delete')
+        keyboard.press_and_release('delete')
         time.sleep(0.1)
         
         # Type each character with small delay for reliability
         for char in amount:
-            platform_keyboard.write(char)
+            keyboard.write(char)
             time.sleep(0.05)
         
         # Extra delay to ensure typing is complete
@@ -461,48 +465,14 @@ class FishingBot:
             print(f"🎯 Right-clicking at custom fishing location: {fishing_coords}")
         else:
             # Fallback to default center-top position
-            screen_width, screen_height = mouse.get_screen_size()
+            import win32api
+            screen_width = win32api.GetSystemMetrics(0)
+            screen_height = win32api.GetSystemMetrics(1)
             fishing_coords = (screen_width // 2, screen_height // 3)
             print(f"🎯 Right-clicking at default fishing location: {fishing_coords}")
         
         self._right_click_at(fishing_coords)
         time.sleep(self.app.purchase_click_delay)
-        
-        # CRITICAL: Re-equip fishing rod after purchase (prevents crashes)
-        if not self.app.main_loop_active:
-            return
-            
-        import platform
-        is_mac = platform.system() == "Darwin"
-        
-        self.app.set_recovery_state("purchase_cleanup", {"action": "equipping_rod"})
-        print("🎣 Re-equipping fishing rod after purchase...")
-        
-        # Get rod key from settings
-        rod_key = getattr(self.app, 'rod_key', '1')
-        
-        # Add extra delay on Mac for keyboard input stability
-        if is_mac:
-            time.sleep(0.8)
-            print(f"🍎 Mac: Using extended delays for rod equip")
-        else:
-            time.sleep(0.3)
-        
-        # Press rod key to equip
-        print(f"🎣 Pressing rod key '{rod_key}'")
-        platform_keyboard.press_and_release(rod_key)
-        
-        # Wait for rod to equip (longer on Mac)
-        time.sleep(1.0 if is_mac else 0.5)
-        
-        # Select bait if auto-bait is enabled
-        if hasattr(self.app, 'bait_manager') and self.app.bait_manager.is_enabled():
-            print("🎣 Selecting bait after purchase...")
-            try:
-                self.app.bait_manager.select_top_bait()
-                time.sleep(0.3)
-            except Exception as e:
-                print(f"⚠️ Bait selection failed: {e}")
         
         if hasattr(self.app, 'webhook_manager'):
             self.app.webhook_manager.send_purchase(amount)
@@ -516,7 +486,10 @@ class FishingBot:
         """Click at coordinates"""
         try:
             x, y = (int(coords[0]), int(coords[1]))
-            mouse.click_at(x, y, button='left')
+            win32api.SetCursorPos((x, y))
+            win32api.mouse_event(win32con.MOUSEEVENTF_MOVE, 0, 1, 0, 0)
+            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
+            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
         except Exception as e:
             pass
     
@@ -524,7 +497,12 @@ class FishingBot:
         """Right click at coordinates"""
         try:
             x, y = (int(coords[0]), int(coords[1]))
-            mouse.click_at(x, y, button='right')
+            win32api.SetCursorPos((x, y))
+            win32api.mouse_event(win32con.MOUSEEVENTF_MOVE, 0, 1, 0, 0)
+            threading.Event().wait(0.05)
+            win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, 0)
+            threading.Event().wait(0.05)
+            win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTUP, 0, 0, 0, 0)
         except Exception as e:
             pass
     
@@ -629,12 +607,8 @@ class FishingBot:
         }
     
     def run_main_loop(self, skip_initial_setup=False):
-        """Main fishing loop with enhanced detection and control"""
-        import platform
-        import traceback
-        
-        system = platform.system()
-        print(f'🎣 Main loop started on {system}')
+        """Main fishing loop with enhanced smart detection and control"""
+        print('🎣 Main loop started with enhanced smart detection')
         target_color = (85, 170, 255)
         dark_color = (25, 25, 25)
         white_color = (255, 255, 255)
@@ -649,20 +623,10 @@ class FishingBot:
             self.app.recovery_count = 0
         
         try:
-            print("📸 Initializing screen capture...")
             with mss.mss() as sct:
-                print("✅ Screen capture initialized")
-                
                 # Initial setup sequence (skip if resuming)
                 if not skip_initial_setup:
-                    print("🔧 Running initial setup...")
-                    try:
-                        self.perform_initial_setup()
-                        print("✅ Initial setup complete")
-                    except Exception as setup_error:
-                        print(f"❌ SETUP ERROR: {setup_error}")
-                        traceback.print_exc()
-                        raise
+                    self.perform_initial_setup()
                 else:
                     print("🔧 Skipping initial setup - resuming from current state")
                 
@@ -701,7 +665,6 @@ class FishingBot:
                         print('Scanning for blue fishing bar...')
                         
                         detection_start_time = time.time()
-                        
                         while self.app.main_loop_active and not self.force_stop_flag:
                             # Update heartbeat frequently during detection
                             self.update_heartbeat()
@@ -733,7 +696,7 @@ class FishingBot:
                                     print(f'⏰ Fish control timeout after {adaptive_timeout + 15:.1f}s, recasting...')
                                     # Clean up mouse state before recasting
                                     if self.app.is_clicking:
-                                        mouse.mouse_up('left')
+                                        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
                                         self.app.is_clicking = False
                                     # Track failed attempt
                                     self.recent_catches.append(False)
@@ -798,7 +761,7 @@ class FishingBot:
                                     
                                     # Clean up mouse state immediately
                                     if self.app.is_clicking:
-                                        mouse.mouse_up('left')
+                                        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
                                         self.app.is_clicking = False
                                     
                                     # Track successful catch for adaptive learning
@@ -962,11 +925,11 @@ class FishingBot:
                                 # Original simple control logic
                                 if pd_output > 0:
                                     if not self.app.is_clicking:
-                                        mouse.mouse_down('left')
+                                        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
                                         self.app.is_clicking = True
                                 else:
                                     if self.app.is_clicking:
-                                        mouse.mouse_up('left')
+                                        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
                                         self.app.is_clicking = False
                             
                             time.sleep(0.1)
@@ -984,9 +947,6 @@ class FishingBot:
                             break  # Exit immediately on force stop
         
         except Exception as e:
-            print(f'🚨 CRITICAL ERROR: {e}')
-            import traceback
-            traceback.print_exc()
             self.app.log(f'🚨 Critical main loop error: {e}', "error")
         
         finally:
@@ -994,25 +954,18 @@ class FishingBot:
             print('🛑 Main loop stopped - cleaning up')
             
             # Stop watchdog
-            try:
-                self.stop_watchdog()
-            except Exception as e:
-                print(f"❌ Watchdog stop error: {e}")
+            self.stop_watchdog()
             
             # Clean up mouse state
             if self.app.is_clicking:
                 try:
-                    mouse.mouse_up('left')
+                    win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
                     self.app.is_clicking = False
-                    print("✅ Mouse released")
-                except Exception as e:
-                    print(f"❌ Mouse release error: {e}")
                 except:
                     pass
     
     def perform_initial_setup(self):
         """Perform initial setup: zoom out, specific zoom in, auto buy if enabled"""
-        import traceback
         print("🔧 Performing initial setup...")
         
         # Set state to prevent watchdog interference
@@ -1022,70 +975,55 @@ class FishingBot:
         self.update_heartbeat()
         
         # Step 1: Auto zoom (only if enabled)
-        try:
-            auto_zoom_enabled = getattr(self.app, 'auto_zoom_var', None) and self.app.auto_zoom_var.get()
-        except Exception as e:
-            print(f"❌ Error checking zoom setting: {e}")
-            auto_zoom_enabled = False
+        auto_zoom_enabled = getattr(self.app, 'auto_zoom_var', None) and self.app.auto_zoom_var.get()
         
         if auto_zoom_enabled:
-            try:
-                if hasattr(self.app, 'zoom_controller'):
-                    if self.app.zoom_controller.is_available():
-                        self.app.set_recovery_state("initial_setup", {"action": "zoom_out"})
-                        print("🔍 Step 1: Full zoom out...")
-                        success_out = self.app.zoom_controller.reset_zoom()
-                        print(f"Zoom out result: {success_out}")
-                        self.update_heartbeat()
-                        time.sleep(1.0)
-                        
-                        # Step 2: Specific zoom in
-                        self.app.set_recovery_state("initial_setup", {"action": "zoom_in"})
-                        print("🔍 Step 2: Specific zoom in...")
-                        success_in = self.app.zoom_controller.zoom_in()
-                        print(f"Zoom in result: {success_in}")
-                        self.update_heartbeat()
-                        time.sleep(1.0)
-                    else:
-                        print("🔍 Zoom controller not available")
+            if hasattr(self.app, 'zoom_controller'):
+                if self.app.zoom_controller.is_available():
+                    self.app.set_recovery_state("initial_setup", {"action": "zoom_out"})
+                    print("🔍 Step 1: Full zoom out...")
+                    success_out = self.app.zoom_controller.reset_zoom()
+                    print(f"Zoom out result: {success_out}")
+                    self.update_heartbeat()  # Update after zoom out
+                    time.sleep(1.0)  # Longer delay to ensure zoom completes
+                    
+                    # Step 2: Specific zoom in
+                    self.app.set_recovery_state("initial_setup", {"action": "zoom_in"})
+                    print("🔍 Step 2: Specific zoom in...")
+                    success_in = self.app.zoom_controller.zoom_in()
+                    print(f"Zoom in result: {success_in}")
+                    self.update_heartbeat()  # Update after zoom in
+                    time.sleep(1.0)  # Longer delay to ensure zoom completes
                 else:
-                    print("🔍 Zoom controller not initialized")
-            except Exception as e:
-                print(f"❌ Zoom error: {e}")
-                traceback.print_exc()
+                    print("🔍 Zoom controller not available (missing pywin32)")
+            else:
+                print("🔍 Zoom controller not initialized")
         else:
             print("🔍 Auto zoom disabled - skipping zoom sequence")
         
         # Step 3: Auto purchase if enabled
-        try:
-            if getattr(self.app, 'auto_purchase_var', None) and self.app.auto_purchase_var.get():
-                print("🛒 Step 3: Auto purchase...")
-                self.app.set_recovery_state("purchasing", {"sequence": "initial_auto_purchase"})
-                self.perform_auto_purchase()
-                time.sleep(1.0)
-        except Exception as e:
-            print(f"❌ Auto-purchase error: {e}")
-            traceback.print_exc()
+        if getattr(self.app, 'auto_purchase_var', None) and self.app.auto_purchase_var.get():
+            print("🛒 Step 3: Auto purchase...")
+            self.app.set_recovery_state("purchasing", {"sequence": "initial_auto_purchase"})
+            self.perform_auto_purchase()
+            # Add delay after auto purchase to ensure it completes
+            time.sleep(1.0)
         
-        # Step 4: Auto bait selection
-        try:
-            if hasattr(self.app, 'bait_manager') and self.app.bait_manager.is_enabled():
-                print("🎣 Step 4: Selecting initial bait...")
-                self.app.set_recovery_state("initial_setup", {"action": "bait_selection"})
-                self.app.bait_manager.select_bait_before_cast()
-                time.sleep(0.5)
-        except Exception as e:
-            print(f"❌ Bait selection error: {e}")
-            traceback.print_exc()
+        # Step 4: Auto bait selection (when rod is in hand)
+        if hasattr(self.app, 'bait_manager') and self.app.bait_manager.is_enabled():
+            print("🎣 Step 4: Selecting initial bait...")
+            self.app.set_recovery_state("initial_setup", {"action": "bait_selection"})
+            self.app.bait_manager.select_bait_before_cast()
+            time.sleep(0.5)
         
-        # Final delay
+        # Final delay to ensure all setup operations are complete before casting
         self.app.set_recovery_state("initial_setup", {"action": "finalizing"})
         print("⏳ Waiting for setup to stabilize...")
         time.sleep(1.5)
         
-        # Reset to idle state
+        # Reset to idle state after setup is complete
         self.app.set_recovery_state("idle", {"action": "setup_complete"})
-        self.update_heartbeat()
+        self.update_heartbeat()  # Final heartbeat update
         print("✅ Initial setup complete")
     
     def process_post_catch_workflow(self):
@@ -1171,27 +1109,6 @@ class FishingBot:
             if not hasattr(self.app, 'ocr_manager') or not self.app.ocr_manager.get_stats()['available']:
                 print("📝 OCR not available, skipping drop search")
                 return drop_info
-            
-            # Check for fruit spawns DURING post-catch (doesn't interfere with fishing control)
-            current_time = time.time()
-            time_since_last_spawn = current_time - self.last_fruit_spawn_time
-            
-            # Only check if we're outside the 15min cooldown after last detection
-            if time_since_last_spawn > self.fruit_spawn_cooldown:
-                try:
-                    spawn_text = self.app.ocr_manager.extract_text()
-                    if spawn_text:
-                        fruit_name = self.app.ocr_manager.detect_fruit_spawn(spawn_text)
-                        if fruit_name:
-                            print(f"🌟 Devil fruit spawn detected: {fruit_name}")
-                            # Record detection time for cooldown
-                            self.last_fruit_spawn_time = current_time
-                            print(f"⏰ Fruit spawn cooldown activated - won't check again for 15 minutes")
-                            # Send webhook
-                            if hasattr(self.app, 'webhook_manager') and getattr(self.app, 'fruit_spawn_webhook_enabled', True):
-                                self.app.webhook_manager.send_fruit_spawn(fruit_name)
-                except Exception as spawn_error:
-                    print(f"⚠️ Spawn check error: {spawn_error}")
             
             # Get drop layout area
             drop_area = self.app.layout_manager.get_layout_area('drop')

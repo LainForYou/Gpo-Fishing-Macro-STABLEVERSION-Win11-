@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, simpledialog
 import threading
+import keyboard
 from pynput import keyboard as pynput_keyboard
 from pynput import mouse as pynput_mouse
 from tkinter import messagebox
@@ -8,12 +9,12 @@ import sys
 import ctypes
 import mss
 import numpy as np
+import win32api
+import win32con
 import json
 import os
 import time
 from datetime import datetime
-from platform_adapter import mouse as platform_mouse
-from platform_adapter import keyboard as platform_keyboard
 # Tray functionality removed - F4 now minimizes to taskbar
 
 try:
@@ -265,32 +266,12 @@ class HotkeyGUI:
             from src.ocr_manager import OCRManager
         except ImportError:
             from ocr_manager import OCRManager
-        
-        print("\n" + "="*60)
-        print("🔧 Initializing OCR (text recognition)...")
-        print("="*60)
         self.ocr_manager = OCRManager(self)  # Pass app reference
         
         # Configure OCR performance mode (default to fast for better performance)
         self.ocr_performance_mode = "fast"
         if hasattr(self.ocr_manager, 'set_performance_mode'):
             self.ocr_manager.set_performance_mode(self.ocr_performance_mode)
-        
-        # Try to initialize OCR early to catch any errors at startup
-        try:
-            if hasattr(self.ocr_manager, '_ensure_ocr_loaded'):
-                if not self.ocr_manager._ensure_ocr_loaded():
-                    import tkinter.messagebox as msgbox
-                    msgbox.showwarning(
-                        "OCR Not Available",
-                        "⚠️ OCR (text recognition) failed to load!\n\n"
-                        "The macro needs OCR to detect items and devil fruits.\n\n"
-                        "Please check the console for installation instructions."
-                    )
-                else:
-                    print("✅ OCR initialized successfully!\n")
-        except Exception as e:
-            print(f"❌ OCR initialization check failed: {e}\n")
         
         # Initialize zoom controller
         try:
@@ -438,7 +419,7 @@ class HotkeyGUI:
         title.grid(row=1, column=0, pady=(0, 5))
         
         # Subtitle
-        credits = ttk.Label(header_frame, text='by Ariel', 
+        credits = ttk.Label(header_frame, text='by LAin (fork Ariel)', 
                            style='Subtitle.TLabel')
         credits.grid(row=2, column=0, pady=(0, 15))
         
@@ -779,18 +760,34 @@ class HotkeyGUI:
 
 
     def _click_at(self, coords):
-        """Move cursor to coords and perform a left click (cross-platform)."""
+        """Move cursor to coords and perform a left click."""  # inserted
         try:
             x, y = (int(coords[0]), int(coords[1]))
-            platform_mouse.click_at(x, y, button='left')
+            win32api.SetCursorPos((x, y))
+            try:
+                win32api.mouse_event(win32con.MOUSEEVENTF_MOVE, 0, 1, 0, 0)
+                threading.Event().wait(0.05)
+                win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
+                threading.Event().wait(0.05)
+                win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
+            except Exception:
+                pass
         except Exception as e:
             print(f'Error clicking at {coords}: {e}')
 
     def _right_click_at(self, coords):
-        """Move cursor to coords and perform a right click (cross-platform)."""
+        """Move cursor to coords and perform a right click."""  # inserted
         try:
             x, y = (int(coords[0]), int(coords[1]))
-            platform_mouse.click_at(x, y, button='right')
+            win32api.SetCursorPos((x, y))
+            try:
+                win32api.mouse_event(win32con.MOUSEEVENTF_MOVE, 0, 1, 0, 0)
+                threading.Event().wait(0.05)
+                win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, 0)
+                threading.Event().wait(0.05)
+                win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTUP, 0, 0, 0, 0)
+            except Exception:
+                pass
         except Exception as e:
             print(f'Error right-clicking at {coords}: {e}')
 
@@ -823,7 +820,7 @@ Sequence (per user spec):
         # Press 'e' key with detailed state tracking
         self.set_recovery_state("menu_opening", {"action": "pressing_e_key", "amount": amount})
         self.log('Pressing E key...', "verbose")
-        platform_keyboard.press_and_release('e')
+        keyboard.press_and_release('e')
         threading.Event().wait(self.purchase_delay_after_key)
         
         if not self.main_loop_active:
@@ -859,7 +856,7 @@ Sequence (per user spec):
         self.set_recovery_state("typing", {"action": "typing_amount", "amount": amount})
         self.log(f'Typing amount: {amount}', "verbose")
         # Type amount
-        platform_keyboard.write(amount)
+        keyboard.write(amount)
         # Extra delay to ensure typing is complete
         threading.Event().wait(self.purchase_after_type_delay + 0.5)
         
@@ -961,11 +958,11 @@ Sequence (per user spec):
     def register_hotkeys(self):
         """Register all hotkeys"""  # inserted
         try:
-            platform_keyboard.unhook_all()
-            platform_keyboard.add_hotkey(self.hotkeys['toggle_loop'], self.toggle_main_loop)
-            platform_keyboard.add_hotkey(self.hotkeys['toggle_layout'], self.toggle_layout)
-            platform_keyboard.add_hotkey(self.hotkeys['exit'], self.exit_app)
-            platform_keyboard.add_hotkey(self.hotkeys['toggle_minimize'], self.toggle_minimize_hotkey)
+            keyboard.unhook_all()
+            keyboard.add_hotkey(self.hotkeys['toggle_loop'], self.toggle_main_loop)
+            keyboard.add_hotkey(self.hotkeys['toggle_layout'], self.toggle_layout)
+            keyboard.add_hotkey(self.hotkeys['exit'], self.exit_app)
+            keyboard.add_hotkey(self.hotkeys['toggle_minimize'], self.toggle_minimize_hotkey)
             print(f"✅ Hotkeys registered: {self.hotkeys}")
         except Exception as e:
             print(f'❌ Error registering hotkeys: {e}')
@@ -1064,6 +1061,12 @@ Sequence (per user spec):
         # Reset everything for fresh start
         self.main_loop_active = True
         self.is_paused = False
+	
+	# Reset fruit spawn cooldown when resuming (be paranoid again)
+        if hasattr(self, 'fishing_bot'):
+            self.fishing_bot.last_fruit_spawn_time = 0
+            print("🔄 Fruit spawn detection reset - checking for spawns immediately")
+	
         self.start_time = time.time()
         self.total_paused_time = 0
         self.reset_fish_counter()
@@ -1091,7 +1094,7 @@ Sequence (per user spec):
         
         # Release mouse if clicking
         if self.is_clicking:
-            platform_mouse.mouse_up('left')
+            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
             self.is_clicking = False
         
         # Update UI
@@ -1109,76 +1112,58 @@ Sequence (per user spec):
         self.main_loop_active = True
         self.is_paused = False
         
-        # Reset fruit spawn cooldown when resuming (be paranoid again)
-        if hasattr(self, 'fishing_bot'):
-            self.fishing_bot.last_fruit_spawn_time = 0
-            print("🔄 Fruit spawn detection reset - checking for spawns immediately")
-        
         # Update UI
         self.loop_status.config(text='● Main Loop: ACTIVE', style='StatusOn.TLabel')
         
-        # Start the loop with detection
+        # Start the loop with smart detection
         self.main_loop_thread = threading.Thread(target=self.smart_resume_loop, daemon=True)
         self.main_loop_thread.start()
         
         # Resume runtime timer
         self.update_runtime_timer()
         
-        self.log('▶️ Fishing resumed', "important")
+        self.log('▶️ Fishing resumed with smart detection', "important")
     
     def smart_resume_loop(self):
-        """Resume loop with detection of current state"""
-        try:
-            import mss
-            import numpy as np
+        """Resume loop with smart detection of current state"""
+        import mss
+        import numpy as np
+        
+        # Check if there's already a blue fishing bar visible
+        target_color = (85, 170, 255)
+        
+        with mss.mss() as sct:
+            # Use current layout area for screenshot
+            current_area = self.layout_manager.get_layout_area(self.layout_manager.current_layout)
+            if not current_area:
+                current_area = {'x': 700, 'y': 400, 'width': 200, 'height': 100}  # Default bar area
+            x = current_area['x']
+            y = current_area['y']
+            width = current_area['width']
+            height = current_area['height']
+            monitor = {'left': x, 'top': y, 'width': width, 'height': height}
+            screenshot = sct.grab(monitor)
+            img = np.array(screenshot)
             
-            # Check if there's already a blue fishing bar visible
-            target_color = (85, 170, 255)
-            
-            with mss.mss() as sct:
-                # Use current layout area for screenshot
-                current_area = self.layout_manager.get_layout_area(self.layout_manager.current_layout)
-                if not current_area:
-                    current_area = {'x': 700, 'y': 400, 'width': 200, 'height': 100}  # Default bar area
-                x = current_area['x']
-                y = current_area['y']
-                width = current_area['width']
-                height = current_area['height']
-                monitor = {'left': x, 'top': y, 'width': width, 'height': height}
-                screenshot = sct.grab(monitor)
-                img = np.array(screenshot)
-                
-                # Look for blue fishing bar
-                blue_found = False
-                for row_idx in range(height):
-                    for col_idx in range(width):
-                        b, g, r = img[row_idx, col_idx, 0:3]
-                        if r == target_color[0] and g == target_color[1] and b == target_color[2]:
-                            blue_found = True
-                            break
-                    if blue_found:
+            # Look for blue fishing bar
+            blue_found = False
+            for row_idx in range(height):
+                for col_idx in range(width):
+                    b, g, r = img[row_idx, col_idx, 0:3]
+                    if r == target_color[0] and g == target_color[1] and b == target_color[2]:
+                        blue_found = True
                         break
-            
-            if blue_found:
-                self.log('🎯 Blue fishing bar detected - resuming from current state', "important")
-                # Jump directly into the main loop detection (skip initial setup)
-                self.fishing_bot.run_main_loop(skip_initial_setup=True)
-            else:
-                self.log('🎣 No fishing bar detected - starting fresh', "important")
-                # Start from scratch with auto-purchase check and casting
-                self.fishing_bot.run_main_loop(skip_initial_setup=False)
-        except Exception as e:
-            print(f"❌ RESUME ERROR: {e}")
-            import traceback
-            traceback.print_exc()
-            # Fall back to starting fresh
-            self.log('⚠️ Detection failed - starting fresh', "error")
-            try:
-                self.fishing_bot.run_main_loop(skip_initial_setup=False)
-            except Exception as e2:
-                print(f"❌ FALLBACK START ERROR: {e2}")
-                traceback.print_exc()
-                self.main_loop_active = False
+                if blue_found:
+                    break
+        
+        if blue_found:
+            self.log('🎯 Blue fishing bar detected - resuming from current state', "important")
+            # Jump directly into the main loop detection (skip initial setup)
+            self.fishing_bot.run_main_loop(skip_initial_setup=True)
+        else:
+            self.log('🎣 No fishing bar detected - starting fresh', "important")
+            # Start from scratch with auto-purchase check and casting
+            self.fishing_bot.run_main_loop(skip_initial_setup=False)
 
     def increment_fish_counter(self):
         """Increment fish counter and update display"""
@@ -1236,29 +1221,16 @@ Sequence (per user spec):
 
     def cast_line(self):
         """Perform the casting action: hold click for 1 second then release"""
-        try:
-            self.log('Casting line...', "verbose")
-            from platform_adapter import mouse
-            mouse.mouse_down('left')
-            time.sleep(1.0)  # More reliable than threading.Event().wait()
-            mouse.mouse_up('left')
-            self.is_clicking = False
-            
-            # Update activity tracking
-            self.last_activity_time = time.time()
-            
-            self.log('Line cast', "verbose")
-        except Exception as e:
-            print(f"❌ CAST ERROR: {e}")
-            import traceback
-            traceback.print_exc()
-            # Ensure mouse is released
-            try:
-                from platform_adapter import mouse
-                mouse.mouse_up('left')
-            except:
-                pass
-            self.is_clicking = False
+        self.log('Casting line...', "verbose")
+        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
+        threading.Event().wait(1.0)
+        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
+        self.is_clicking = False
+        
+        # Update activity tracking
+        self.last_activity_time = time.time()
+        
+        self.log('Line cast', "verbose")
 
     def main_loop(self):
         """Main loop that runs when activated - delegates to fishing bot"""
@@ -1336,7 +1308,7 @@ Sequence (per user spec):
 
         # Unhook all keyboard events
         try:
-            platform_keyboard.unhook_all()
+            keyboard.unhook_all()
         except Exception:
             pass
 

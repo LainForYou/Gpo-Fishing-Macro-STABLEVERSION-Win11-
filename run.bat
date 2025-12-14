@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 title GPO Autofish - Starting...
-cd /d "%~dp0\..\..\"
+cd /d "%~dp0"
 
 echo ========================================
 echo   GPO Autofish - Loading...

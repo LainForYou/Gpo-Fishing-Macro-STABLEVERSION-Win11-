@@ -1,8 +1,0 @@
-# GPO Autofish - Windows-Specific Dependencies
-# Install with: pip install -r requirements-windows.txt
-
-# Include all common dependencies
--r requirements-common.txt
-
-# Windows-specific packages
-pywin32  # Windows API for precise mouse control

@@ -21,128 +21,47 @@ except ImportError:
     FALLBACK_AVAILABLE = False
     print("⚠️ NumPy/OpenCV not available - text detection disabled")
 
-# Lazy OCR loading - don't import at startup to avoid crashes
-OCR_AVAILABLE = None  # Will be determined on first use
-OCR_ENGINE = None
-easyocr = None
-paddleocr = None
-
-# Always try to import PIL for image processing
+# Try OCR engines - prioritize EasyOCR since it's more commonly installed
 try:
+    # Try EasyOCR first
+    import easyocr
     from PIL import Image, ImageEnhance
-    PIL_AVAILABLE = True
-except ImportError:
-    PIL_AVAILABLE = False
-    # Create dummy classes for type hints when PIL not available
-    class DummyImage:
-        Image = object
-        LANCZOS = 1
-    class DummyEnhance:
-        pass
-    
-    Image = DummyImage()
-    ImageEnhance = DummyEnhance()
-    print("⚠️ PIL not available - image processing disabled")
-
-def _try_load_ocr():
-    """Lazy load OCR engines with robust error handling for Mac/Linux"""
-    global OCR_AVAILABLE, OCR_ENGINE, easyocr, paddleocr
-    
-    if OCR_AVAILABLE is not None:
-        return OCR_AVAILABLE  # Already tried loading
-    
-    import platform
-    import os
-    import ssl
-    system = platform.system()
-    
-    # Mac-specific: Fix SSL certificate issues
-    if system == "Darwin":  # macOS
-        os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
-        os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
-        
-        # Fix SSL certificate verification on Mac
-        try:
-            import certifi
-            os.environ['SSL_CERT_FILE'] = certifi.where()
-            os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
-        except ImportError:
-            print("⚠️  certifi not found - SSL issues may occur")
-            # Try to use system certificates as fallback
-            try:
-                ssl._create_default_https_context = ssl._create_unverified_context
-                print("   Using unverified SSL context (fallback)")
-            except:
-                pass
-        
-        print("🍎 Mac detected - applying compatibility fixes...")
-    
+    OCR_AVAILABLE = True
+    OCR_ENGINE = "easy"
+    print("✅ EasyOCR loaded successfully - text recognition available!")
+except ImportError as e:
+    print(f"🔍 EasyOCR import failed: {e}")
     try:
-        # Try EasyOCR first with comprehensive error handling
-        print("🔧 Loading EasyOCR libraries...")
-        import easyocr as _easyocr
-        easyocr = _easyocr
-        OCR_AVAILABLE = True
-        OCR_ENGINE = "easy"
-        print("✅ EasyOCR loaded successfully - text recognition available!")
-        return True
-    except ImportError as e:
-        print(f"❌ EasyOCR not installed: {e}")
-        print("   Install with: pip install easyocr")
-    except Exception as e:
-        error_msg = str(e)
-        print(f"❌ EasyOCR loading failed: {error_msg}")
-        
-        # Mac-specific error guidance
-        if system == "Darwin":
-            if "library" in error_msg.lower() or "dylib" in error_msg.lower():
-                print("⚠️  Mac library issue detected!")
-                print("   Try: pip uninstall torch torchvision")
-                print("   Then: pip install torch torchvision --no-cache-dir")
-            elif "mps" in error_msg.lower():
-                print("⚠️  Mac MPS (GPU) issue - trying CPU fallback...")
-    
-    # Try PaddleOCR as fallback
-    try:
-        print("🔧 Trying PaddleOCR as fallback...")
-        import paddleocr as _paddleocr
-        paddleocr = _paddleocr
+        # Fallback to PaddleOCR
+        import paddleocr
+        from PIL import Image, ImageEnhance
         OCR_AVAILABLE = True
         OCR_ENGINE = "paddle"
-        print("✅ PaddleOCR loaded - lightweight OCR engine active!")
-        return True
-    except Exception as e2:
-        print(f"❌ PaddleOCR also failed: {e2}")
-    
-    # Both failed
-    OCR_AVAILABLE = False
-    OCR_ENGINE = None
-    print("\n" + "="*60)
-    print("❌ CRITICAL: OCR is required for this macro to function!")
-    print("="*60)
-    print("\n📋 Installation Instructions:")
-    print(f"   System: {system}")
-    print("\n   Option 1 (Recommended): Install EasyOCR")
-    print("   pip install easyocr")
-    
-    if system == "Darwin":
-        print("\n   Mac-specific: If EasyOCR fails, try:")
-        print("   1. pip install torch torchvision --no-cache-dir")
-        print("   2. pip install easyocr --no-cache-dir")
-    
-    print("\n   Option 2 (Lightweight): Install PaddleOCR")
-    print("   pip install paddleocr")
-    print("\n" + "="*60)
-    
-    return False
+        print("✅ PaddleOCR loaded successfully - lightweight text recognition!")
+    except ImportError as e2:
+        print(f"🔍 PaddleOCR import failed: {e2}")
+        OCR_AVAILABLE = False
+        OCR_ENGINE = None
+        # Create dummy classes for type hints when OCR not available
+        class DummyImage:
+            Image = object
+            LANCZOS = 1
+        class DummyEnhance:
+            pass
+        
+        Image = DummyImage()
+        ImageEnhance = DummyEnhance()
+        if FALLBACK_AVAILABLE:
+            print("⚠️ No OCR engine available - using fallback text detection")
+        else:
+            print("❌ No text detection available - install numpy and opencv-python")
 
 class OCRManager:
     """Manages text recognition from screenshot areas using EasyOCR"""
     
     def __init__(self, app=None):
         self.app = app  # Reference to main app for accessing layout manager
-        self.ocr_available = None  # Will be determined on first use
-        self.ocr_load_attempted = False
+        self.ocr_available = OCR_AVAILABLE
         self.last_text = ""
         self.last_capture_time = 0
         self.capture_cooldown = 2.0  # Increased cooldown to reduce CPU load
@@ -259,93 +178,8 @@ class OCRManager:
                 self.ocr_available = False
                 self.reader = None
     
-    def _ensure_ocr_loaded(self):
-        """Lazy load OCR only when first needed - with robust Mac support"""
-        if self.ocr_load_attempted:
-            return self.ocr_available
-            
-        self.ocr_load_attempted = True
-        
-        # Try to load OCR libraries
-        print("🔍 Checking OCR availability...")
-        if not _try_load_ocr():
-            self.ocr_available = False
-            print("⚠️ OCR NOT available - macro may have limited functionality")
-            return False
-            
-        self.ocr_available = True
-        
-        # Initialize the reader with platform-specific settings
-        import platform
-        system = platform.system()
-        
-        try:
-            if OCR_ENGINE == "easy":
-                print("🔧 Initializing EasyOCR reader (this may take a moment)...")
-                
-                # Mac-specific: Force CPU mode to avoid MPS/GPU issues
-                if system == "Darwin":
-                    import os
-                    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # Disable CUDA
-                    print("   🍎 Mac: Forcing CPU mode for stability...")
-                
-                # Initialize with conservative settings
-                try:
-                    self.reader = easyocr.Reader(
-                        ['en'], 
-                        gpu=False,  # Always use CPU for stability
-                        verbose=False,
-                        download_enabled=True,
-                        model_storage_directory=None  # Use default location
-                    )
-                    print("✅ EasyOCR reader initialized successfully!")
-                    return True
-                except Exception as download_error:
-                    # Handle SSL/download errors specifically
-                    error_str = str(download_error)
-                    if "SSL" in error_str or "certificate" in error_str.lower():
-                        print(f"❌ SSL Certificate Error: {download_error}")
-                        print("\n🔧 Mac SSL Certificate Fix:")
-                        print("   Option 1: Install certifi")
-                        print("   pip install --upgrade certifi")
-                        print("\n   Option 2: Run Python's certificate installer")
-                        print("   /Applications/Python\\ 3.*/Install\\ Certificates.command")
-                        print("\n   Option 3: Install models manually")
-                        print("   python -c \"import easyocr; easyocr.Reader(['en'])\"")
-                    raise
-                
-            elif OCR_ENGINE == "paddle":
-                print("🔧 Initializing PaddleOCR reader...")
-                self.reader = paddleocr.PaddleOCR(
-                    use_angle_cls=True, 
-                    lang='en', 
-                    show_log=False,
-                    use_gpu=False  # Always CPU for stability
-                )
-                print("✅ PaddleOCR reader initialized successfully!")
-                return True
-                
-        except Exception as e:
-            error_msg = str(e)
-            print(f"❌ Failed to initialize OCR reader: {error_msg}")
-            
-            # Mac-specific troubleshooting
-            if system == "Darwin":
-                if "torch" in error_msg.lower() or "library" in error_msg.lower():
-                    print("\n🔧 Mac Troubleshooting:")
-                    print("   Run these commands:")
-                    print("   pip uninstall torch torchvision -y")
-                    print("   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu")
-                    print("   pip install easyocr --no-cache-dir")
-            
-            self.ocr_available = False
-            self.reader = None
-            return False
-    
     def is_available(self) -> bool:
         """Check if OCR is available and configured"""
-        if not self.ocr_load_attempted:
-            self._ensure_ocr_loaded()
         return self.ocr_available
     
     def extract_text(self, screenshot_area=None) -> Optional[str]:
@@ -359,10 +193,6 @@ class OCRManager:
         Returns:
             Extracted and filtered text, or None if no text found
         """
-        # Lazy load OCR on first use
-        if not self.ocr_load_attempted:
-            self._ensure_ocr_loaded()
-        
         # Always capture from drop layout area
         screenshot_area = self.capture_drop_area()
         if screenshot_area is None:
@@ -672,46 +502,32 @@ class OCRManager:
         
         text_lower = text.lower()
         
-        # Look for spawn keywords (including common OCR typos)
-        spawn_keywords = ['spawned', 'spavned', 'has spawned', 'spawn']
+        # Look for spawn keywords first
+        spawn_keywords = ['spawned', 'has spawned', 'spawn']
         has_spawn_keyword = any(keyword in text_lower for keyword in spawn_keywords)
         
         if not has_spawn_keyword:
-            # Also check if "spawn" appears anywhere as part of a word
-            if 'spawn' not in text_lower and 'spavn' not in text_lower:
-                return None
+            return None
         
         # Try to find fruit name using fuzzy matching
-        best_match = None
-        best_similarity = 0
-        best_fruit = None
-        
         for i, fruit_lower in enumerate(self.devil_fruits_lower):
-            # Direct match (exact)
+            # Direct match
             if fruit_lower in text_lower:
-                print(f"✅ Direct fruit match: {self.devil_fruits[i]}")
                 return self.devil_fruits[i]
             
-            # Fuzzy match - find BEST match, not first match
+            # Fuzzy match - allow for OCR errors (1-2 character differences)
             if len(fruit_lower) >= 3:
+                # Check if most characters match in sequence
                 for word in text_lower.split():
                     if len(word) >= 3:
                         # Calculate similarity
                         matches = sum(1 for a, b in zip(fruit_lower, word) if a == b)
                         similarity = matches / max(len(fruit_lower), len(word))
                         
-                        # Track best match
-                        if similarity > best_similarity:
-                            best_similarity = similarity
-                            best_match = word
-                            best_fruit = self.devil_fruits[i]
+                        # Accept if 70%+ similarity
+                        if similarity >= 0.7:
+                            return self.devil_fruits[i]
         
-        # Return best match if similarity is good enough
-        if best_similarity >= 0.7:
-            print(f"✅ Fuzzy fruit match: '{best_match}' → {best_fruit} ({best_similarity*100:.0f}% similar)")
-            return best_fruit
-        
-        print(f"❌ No fruit name found in text: {text_lower}")
         return None
     
     def get_stats(self) -> dict:

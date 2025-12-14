@@ -8,11 +8,12 @@ import time
 from typing import Optional
 
 try:
-    from platform_adapter import mouse
+    import win32api
+    import win32con
     ZOOM_AVAILABLE = True
 except ImportError:
     ZOOM_AVAILABLE = False
-    logging.warning("Zoom control not available.")
+    logging.warning("Zoom control not available. Install: pip install pywin32")
 
 class ZoomController:
     """Manages automatic zoom control for the game"""
@@ -92,8 +93,8 @@ class ZoomController:
         
         try:
             for i in range(steps):
-                # Scroll down (negative value = zoom out)
-                mouse.scroll(-1)
+                # Scroll down (negative wheel delta = zoom out)
+                win32api.mouse_event(win32con.MOUSEEVENTF_WHEEL, 0, 0, -120, 0)
                 time.sleep(self.zoom_settings["step_delay"])
                 
             # Only update timestamp if not part of a sequence
@@ -128,8 +129,8 @@ class ZoomController:
         
         try:
             for i in range(steps):
-                # Scroll up (positive value = zoom in)
-                mouse.scroll(1)
+                # Scroll up (positive wheel delta = zoom in)
+                win32api.mouse_event(win32con.MOUSEEVENTF_WHEEL, 0, 0, 120, 0)
                 time.sleep(self.zoom_settings["step_delay"])
                 
             # Only update timestamp if not part of a sequence

@@ -12,13 +12,14 @@ else:
     sys.path.insert(0, os.path.dirname(__file__))
 
 from gui import HotkeyGUI
-from platform_adapter import system
 
 def main():
     root = tk.Tk()
     
-    # Set DPI awareness (Windows only, handled automatically on Mac/Linux)
-    system.set_dpi_awareness()
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+    except:
+        pass
     
     # Set window icon
     try:
