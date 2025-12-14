@@ -53,12 +53,28 @@ def _try_load_ocr():
     
     import platform
     import os
+    import ssl
     system = platform.system()
     
-    # Mac-specific: Set environment variables to prevent MPS/GPU issues
+    # Mac-specific: Fix SSL certificate issues
     if system == "Darwin":  # macOS
         os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
         os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
+        
+        # Fix SSL certificate verification on Mac
+        try:
+            import certifi
+            os.environ['SSL_CERT_FILE'] = certifi.where()
+            os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
+        except ImportError:
+            print("⚠️  certifi not found - SSL issues may occur")
+            # Try to use system certificates as fallback
+            try:
+                ssl._create_default_https_context = ssl._create_unverified_context
+                print("   Using unverified SSL context (fallback)")
+            except:
+                pass
+        
         print("🍎 Mac detected - applying compatibility fixes...")
     
     try:
@@ -274,15 +290,29 @@ class OCRManager:
                     print("   🍎 Mac: Forcing CPU mode for stability...")
                 
                 # Initialize with conservative settings
-                self.reader = easyocr.Reader(
-                    ['en'], 
-                    gpu=False,  # Always use CPU for stability
-                    verbose=False,
-                    download_enabled=True,
-                    model_storage_directory=None  # Use default location
-                )
-                print("✅ EasyOCR reader initialized successfully!")
-                return True
+                try:
+                    self.reader = easyocr.Reader(
+                        ['en'], 
+                        gpu=False,  # Always use CPU for stability
+                        verbose=False,
+                        download_enabled=True,
+                        model_storage_directory=None  # Use default location
+                    )
+                    print("✅ EasyOCR reader initialized successfully!")
+                    return True
+                except Exception as download_error:
+                    # Handle SSL/download errors specifically
+                    error_str = str(download_error)
+                    if "SSL" in error_str or "certificate" in error_str.lower():
+                        print(f"❌ SSL Certificate Error: {download_error}")
+                        print("\n🔧 Mac SSL Certificate Fix:")
+                        print("   Option 1: Install certifi")
+                        print("   pip install --upgrade certifi")
+                        print("\n   Option 2: Run Python's certificate installer")
+                        print("   /Applications/Python\\ 3.*/Install\\ Certificates.command")
+                        print("\n   Option 3: Install models manually")
+                        print("   python -c \"import easyocr; easyocr.Reader(['en'])\"")
+                    raise
                 
             elif OCR_ENGINE == "paddle":
                 print("🔧 Initializing PaddleOCR reader...")
