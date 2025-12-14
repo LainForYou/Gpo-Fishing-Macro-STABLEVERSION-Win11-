@@ -1136,29 +1136,29 @@ Sequence (per user spec):
             target_color = (85, 170, 255)
             
             with mss.mss() as sct:
-            # Use current layout area for screenshot
-            current_area = self.layout_manager.get_layout_area(self.layout_manager.current_layout)
-            if not current_area:
-                current_area = {'x': 700, 'y': 400, 'width': 200, 'height': 100}  # Default bar area
-            x = current_area['x']
-            y = current_area['y']
-            width = current_area['width']
-            height = current_area['height']
-            monitor = {'left': x, 'top': y, 'width': width, 'height': height}
-            screenshot = sct.grab(monitor)
-            img = np.array(screenshot)
-            
-            # Look for blue fishing bar
-            blue_found = False
-            for row_idx in range(height):
-                for col_idx in range(width):
-                    b, g, r = img[row_idx, col_idx, 0:3]
-                    if r == target_color[0] and g == target_color[1] and b == target_color[2]:
-                        blue_found = True
+                # Use current layout area for screenshot
+                current_area = self.layout_manager.get_layout_area(self.layout_manager.current_layout)
+                if not current_area:
+                    current_area = {'x': 700, 'y': 400, 'width': 200, 'height': 100}  # Default bar area
+                x = current_area['x']
+                y = current_area['y']
+                width = current_area['width']
+                height = current_area['height']
+                monitor = {'left': x, 'top': y, 'width': width, 'height': height}
+                screenshot = sct.grab(monitor)
+                img = np.array(screenshot)
+                
+                # Look for blue fishing bar
+                blue_found = False
+                for row_idx in range(height):
+                    for col_idx in range(width):
+                        b, g, r = img[row_idx, col_idx, 0:3]
+                        if r == target_color[0] and g == target_color[1] and b == target_color[2]:
+                            blue_found = True
+                            break
+                    if blue_found:
                         break
-                if blue_found:
-                    break
-        
+            
             if blue_found:
                 self.log('🎯 Blue fishing bar detected - resuming from current state', "important")
                 # Jump directly into the main loop detection (skip initial setup)
