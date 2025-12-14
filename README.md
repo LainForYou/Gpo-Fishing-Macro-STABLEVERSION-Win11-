@@ -1,8 +1,8 @@
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-7289da?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/unPZxXAtfb)
 
-# 🎣 GPO Autofish - GUIDE (Windows, macOS, Linux)
+# 🎣 GPO Autofish win 11
 
-**💬 Join our Discord server:** https://discord.gg/unPZxXAtfb
+**💬 Join ARIEL Discord server:** https://discord.gg/unPZxXAtfb
 
 ## What is this?
 
@@ -12,11 +12,8 @@ This is the **open-source version** of the GPO fishing macro that everyone uses.
 - ✅ **No viruses** - Clean, transparent, and safe
 - ✅ **Improved** - Better features and reliability
 - ✅ **Community-driven** - Open for contributions and review
-- ✅ **Cross-platform** - Works on Windows, macOS, and Linux
 
 The original closed-source macro is sketchy and often flagged by antivirus software because you can't verify what it's actually doing. This open-source version solves that problem.
-
-**🛡️ Concerned about safety? Read [IS_IT_A_VIRUS.md](IS_IT_A_VIRUS.md) for more information.**
 
 ---
 
@@ -93,17 +90,6 @@ The original closed-source macro is sketchy and often flagged by antivirus softw
    - **Standard mode:** Double-click `installers\windows\run.bat` (silent, no console)
    - **Dev mode:** Double-click `installers\windows\run_dev.bat` (with console for debugging)
 
-### 🍎 macOS Installation
-
-**Install Python:**
-
-```bash
-# Using Homebrew (recommended)
-brew install python@3.12
-
-# Or download from python.org
-```
-
 **Easy Installation:**
 
 1. **Download the repository** and extract it
@@ -132,52 +118,6 @@ brew install python@3.12
 - Add Terminal or Python to the allowed apps list
 - **F1-F4 hotkeys are fully supported** - No admin privileges required!
 
-### 🐧 Linux Installation
-
-**Install Python:**
-
-```bash
-# Ubuntu/Debian
-sudo apt update
-sudo apt install python3.12 python3-pip python3-tk python3-dev
-
-# Fedora
-sudo dnf install python3.12 python3-pip python3-tkinter python3-devel
-
-# Arch
-sudo pacman -S python python-pip tk
-```
-
-**Easy Installation:**
-
-1. **Download the repository** and extract it
-2. **Open Terminal** and navigate to the folder:
-   ```bash
-   cd path/to/gpo-fishing
-   ```
-3. **Make scripts executable:**
-   ```bash
-   chmod +x installers/linux/install.sh
-   chmod +x installers/linux/run.sh
-   chmod +x installers/linux/run_dev.sh
-   ```
-4. **Run installation:**
-   ```bash
-   ./installers/linux/install.sh
-   ```
-5. **Run the application:**
-   - **Standard mode:** `./installers/linux/run.sh`
-   - **Dev mode:** `./installers/linux/run_dev.sh`
-
-**Additional Linux Dependencies:**
-
-```bash
-# Ubuntu/Debian - for OpenCV and screenshot support
-sudo apt install libgl1-mesa-glx libglib2.0-0 scrot
-
-# Note: Hotkeys work without sudo privileges! F1-F4 keys are fully supported.
-```
-
 ### 🔧 Manual Installation (All Platforms)
 
 1. **Install Python 3.12 or 3.13**
@@ -199,22 +139,11 @@ sudo apt install libgl1-mesa-glx libglib2.0-0 scrot
    # Windows
    pip install -r requirements-windows.txt
 
-   # macOS
-   pip3 install -r requirements-mac.txt
-
-   # Linux
-   pip3 install -r requirements-linux.txt
-   ```
-
 4. **Run the application**
 
    ```bash
    # Windows
    python src/main.py
-
-   # macOS/Linux
-   python3 src/main.py
-   ```
 
 ## 🎮 Quick Start Guide
 
@@ -276,7 +205,6 @@ sudo apt install libgl1-mesa-glx libglib2.0-0 scrot
 ### Runtime Issues
 
 - **Hotkeys not working**:
-  - macOS/Linux: Grant Accessibility permissions in System Preferences (macOS) or similar settings (Linux)
   - Note: F1-F4 keys work without admin/sudo privileges on all platforms!
   - If hotkeys still don't work, try rebinding them using the "Rebind" buttons in the UI
 - **Fish detection failing**: Adjust overlay position over the blue fishing bar
@@ -322,11 +250,6 @@ src/
 ├── platform_adapter.py  # Cross-platform mouse/system abstraction
 ├── bait_manager.py      # Bait purchasing and inventory management
 └── utils.py             # Utility classes
-
-installers/
-├── windows/             # Windows installation scripts (.bat)
-├── mac/                 # macOS installation scripts (.sh)
-└── linux/               # Linux installation scripts (.sh)
 ```
 
 This modular structure makes the code:
