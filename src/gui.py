@@ -265,12 +265,32 @@ class HotkeyGUI:
             from src.ocr_manager import OCRManager
         except ImportError:
             from ocr_manager import OCRManager
+        
+        print("\n" + "="*60)
+        print("🔧 Initializing OCR (text recognition)...")
+        print("="*60)
         self.ocr_manager = OCRManager(self)  # Pass app reference
         
         # Configure OCR performance mode (default to fast for better performance)
         self.ocr_performance_mode = "fast"
         if hasattr(self.ocr_manager, 'set_performance_mode'):
             self.ocr_manager.set_performance_mode(self.ocr_performance_mode)
+        
+        # Try to initialize OCR early to catch any errors at startup
+        try:
+            if hasattr(self.ocr_manager, '_ensure_ocr_loaded'):
+                if not self.ocr_manager._ensure_ocr_loaded():
+                    import tkinter.messagebox as msgbox
+                    msgbox.showwarning(
+                        "OCR Not Available",
+                        "⚠️ OCR (text recognition) failed to load!\n\n"
+                        "The macro needs OCR to detect items and devil fruits.\n\n"
+                        "Please check the console for installation instructions."
+                    )
+                else:
+                    print("✅ OCR initialized successfully!\n")
+        except Exception as e:
+            print(f"❌ OCR initialization check failed: {e}\n")
         
         # Initialize zoom controller
         try:

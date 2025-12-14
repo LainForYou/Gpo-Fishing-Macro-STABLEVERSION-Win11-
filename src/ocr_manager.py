@@ -21,47 +21,112 @@ except ImportError:
     FALLBACK_AVAILABLE = False
     print("⚠️ NumPy/OpenCV not available - text detection disabled")
 
-# Try OCR engines - prioritize EasyOCR since it's more commonly installed
+# Lazy OCR loading - don't import at startup to avoid crashes
+OCR_AVAILABLE = None  # Will be determined on first use
+OCR_ENGINE = None
+easyocr = None
+paddleocr = None
+
+# Always try to import PIL for image processing
 try:
-    # Try EasyOCR first
-    import easyocr
     from PIL import Image, ImageEnhance
-    OCR_AVAILABLE = True
-    OCR_ENGINE = "easy"
-    print("✅ EasyOCR loaded successfully - text recognition available!")
-except ImportError as e:
-    print(f"🔍 EasyOCR import failed: {e}")
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
+    # Create dummy classes for type hints when PIL not available
+    class DummyImage:
+        Image = object
+        LANCZOS = 1
+    class DummyEnhance:
+        pass
+    
+    Image = DummyImage()
+    ImageEnhance = DummyEnhance()
+    print("⚠️ PIL not available - image processing disabled")
+
+def _try_load_ocr():
+    """Lazy load OCR engines with robust error handling for Mac/Linux"""
+    global OCR_AVAILABLE, OCR_ENGINE, easyocr, paddleocr
+    
+    if OCR_AVAILABLE is not None:
+        return OCR_AVAILABLE  # Already tried loading
+    
+    import platform
+    import os
+    system = platform.system()
+    
+    # Mac-specific: Set environment variables to prevent MPS/GPU issues
+    if system == "Darwin":  # macOS
+        os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
+        os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
+        print("🍎 Mac detected - applying compatibility fixes...")
+    
     try:
-        # Fallback to PaddleOCR
-        import paddleocr
-        from PIL import Image, ImageEnhance
+        # Try EasyOCR first with comprehensive error handling
+        print("🔧 Loading EasyOCR libraries...")
+        import easyocr as _easyocr
+        easyocr = _easyocr
+        OCR_AVAILABLE = True
+        OCR_ENGINE = "easy"
+        print("✅ EasyOCR loaded successfully - text recognition available!")
+        return True
+    except ImportError as e:
+        print(f"❌ EasyOCR not installed: {e}")
+        print("   Install with: pip install easyocr")
+    except Exception as e:
+        error_msg = str(e)
+        print(f"❌ EasyOCR loading failed: {error_msg}")
+        
+        # Mac-specific error guidance
+        if system == "Darwin":
+            if "library" in error_msg.lower() or "dylib" in error_msg.lower():
+                print("⚠️  Mac library issue detected!")
+                print("   Try: pip uninstall torch torchvision")
+                print("   Then: pip install torch torchvision --no-cache-dir")
+            elif "mps" in error_msg.lower():
+                print("⚠️  Mac MPS (GPU) issue - trying CPU fallback...")
+    
+    # Try PaddleOCR as fallback
+    try:
+        print("🔧 Trying PaddleOCR as fallback...")
+        import paddleocr as _paddleocr
+        paddleocr = _paddleocr
         OCR_AVAILABLE = True
         OCR_ENGINE = "paddle"
-        print("✅ PaddleOCR loaded successfully - lightweight text recognition!")
-    except ImportError as e2:
-        print(f"🔍 PaddleOCR import failed: {e2}")
-        OCR_AVAILABLE = False
-        OCR_ENGINE = None
-        # Create dummy classes for type hints when OCR not available
-        class DummyImage:
-            Image = object
-            LANCZOS = 1
-        class DummyEnhance:
-            pass
-        
-        Image = DummyImage()
-        ImageEnhance = DummyEnhance()
-        if FALLBACK_AVAILABLE:
-            print("⚠️ No OCR engine available - using fallback text detection")
-        else:
-            print("❌ No text detection available - install numpy and opencv-python")
+        print("✅ PaddleOCR loaded - lightweight OCR engine active!")
+        return True
+    except Exception as e2:
+        print(f"❌ PaddleOCR also failed: {e2}")
+    
+    # Both failed
+    OCR_AVAILABLE = False
+    OCR_ENGINE = None
+    print("\n" + "="*60)
+    print("❌ CRITICAL: OCR is required for this macro to function!")
+    print("="*60)
+    print("\n📋 Installation Instructions:")
+    print(f"   System: {system}")
+    print("\n   Option 1 (Recommended): Install EasyOCR")
+    print("   pip install easyocr")
+    
+    if system == "Darwin":
+        print("\n   Mac-specific: If EasyOCR fails, try:")
+        print("   1. pip install torch torchvision --no-cache-dir")
+        print("   2. pip install easyocr --no-cache-dir")
+    
+    print("\n   Option 2 (Lightweight): Install PaddleOCR")
+    print("   pip install paddleocr")
+    print("\n" + "="*60)
+    
+    return False
 
 class OCRManager:
     """Manages text recognition from screenshot areas using EasyOCR"""
     
     def __init__(self, app=None):
         self.app = app  # Reference to main app for accessing layout manager
-        self.ocr_available = OCR_AVAILABLE
+        self.ocr_available = None  # Will be determined on first use
+        self.ocr_load_attempted = False
         self.last_text = ""
         self.last_capture_time = 0
         self.capture_cooldown = 2.0  # Increased cooldown to reduce CPU load
@@ -178,8 +243,79 @@ class OCRManager:
                 self.ocr_available = False
                 self.reader = None
     
+    def _ensure_ocr_loaded(self):
+        """Lazy load OCR only when first needed - with robust Mac support"""
+        if self.ocr_load_attempted:
+            return self.ocr_available
+            
+        self.ocr_load_attempted = True
+        
+        # Try to load OCR libraries
+        print("🔍 Checking OCR availability...")
+        if not _try_load_ocr():
+            self.ocr_available = False
+            print("⚠️ OCR NOT available - macro may have limited functionality")
+            return False
+            
+        self.ocr_available = True
+        
+        # Initialize the reader with platform-specific settings
+        import platform
+        system = platform.system()
+        
+        try:
+            if OCR_ENGINE == "easy":
+                print("🔧 Initializing EasyOCR reader (this may take a moment)...")
+                
+                # Mac-specific: Force CPU mode to avoid MPS/GPU issues
+                if system == "Darwin":
+                    import os
+                    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # Disable CUDA
+                    print("   🍎 Mac: Forcing CPU mode for stability...")
+                
+                # Initialize with conservative settings
+                self.reader = easyocr.Reader(
+                    ['en'], 
+                    gpu=False,  # Always use CPU for stability
+                    verbose=False,
+                    download_enabled=True,
+                    model_storage_directory=None  # Use default location
+                )
+                print("✅ EasyOCR reader initialized successfully!")
+                return True
+                
+            elif OCR_ENGINE == "paddle":
+                print("🔧 Initializing PaddleOCR reader...")
+                self.reader = paddleocr.PaddleOCR(
+                    use_angle_cls=True, 
+                    lang='en', 
+                    show_log=False,
+                    use_gpu=False  # Always CPU for stability
+                )
+                print("✅ PaddleOCR reader initialized successfully!")
+                return True
+                
+        except Exception as e:
+            error_msg = str(e)
+            print(f"❌ Failed to initialize OCR reader: {error_msg}")
+            
+            # Mac-specific troubleshooting
+            if system == "Darwin":
+                if "torch" in error_msg.lower() or "library" in error_msg.lower():
+                    print("\n🔧 Mac Troubleshooting:")
+                    print("   Run these commands:")
+                    print("   pip uninstall torch torchvision -y")
+                    print("   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu")
+                    print("   pip install easyocr --no-cache-dir")
+            
+            self.ocr_available = False
+            self.reader = None
+            return False
+    
     def is_available(self) -> bool:
         """Check if OCR is available and configured"""
+        if not self.ocr_load_attempted:
+            self._ensure_ocr_loaded()
         return self.ocr_available
     
     def extract_text(self, screenshot_area=None) -> Optional[str]:
@@ -193,6 +329,10 @@ class OCRManager:
         Returns:
             Extracted and filtered text, or None if no text found
         """
+        # Lazy load OCR on first use
+        if not self.ocr_load_attempted:
+            self._ensure_ocr_loaded()
+        
         # Always capture from drop layout area
         screenshot_area = self.capture_drop_area()
         if screenshot_area is None:
