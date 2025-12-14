@@ -29,7 +29,7 @@
   "scan_timeout": 14.0,
   "wait_after_loss": 1.0,
   "smart_check_interval": 15.0,
-  "webhook_url": "https://discord.com/api/webhooks/1444724030828449833/vsvrAhDdYG06kT1rTjMBgh98UMMzQn_oLAUHueTfEeTHsFTNfSnMufyLW_2n2wwHtscy",
+  "webhook_url": "",
   "webhook_enabled": true,
   "webhook_interval": 100,
   "fish_progress_webhook_enabled": true,
