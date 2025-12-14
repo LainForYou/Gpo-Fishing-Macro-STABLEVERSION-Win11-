@@ -416,53 +416,65 @@ class KeyboardController:
     
     def press_and_release(self, key: str):
         """
-        Press and release a key.
+        Press and release a key with error handling for Mac stability.
         
         Args:
             key: Key to press (e.g., 'a', 'enter', 'ctrl+c')
         """
-        if self._backend == "keyboard":
-            self._keyboard.press_and_release(key)
-        else:
-            # Use pynput controller
-            controller = self._pynput.Controller()
-            
-            # Handle combinations like 'ctrl+a'
-            if '+' in key:
-                keys = [k.strip() for k in key.split('+')]
-                pynput_keys = [self._key_to_pynput(k) for k in keys]
+        try:
+            if self._backend == "keyboard":
+                self._keyboard.press_and_release(key)
+            else:
+                # Use pynput controller with robust error handling
+                controller = self._pynput.Controller()
                 
-                # Press all keys
-                for pkey in pynput_keys:
+                # Handle combinations like 'ctrl+a'
+                if '+' in key:
+                    keys = [k.strip() for k in key.split('+')]
+                    pynput_keys = [self._key_to_pynput(k) for k in keys]
+                    
+                    # Press all keys
+                    for pkey in pynput_keys:
+                        if pkey:
+                            controller.press(pkey)
+                            time.sleep(0.02)  # Slightly longer delay on Mac
+                    
+                    # Release in reverse order
+                    for pkey in reversed(pynput_keys):
+                        if pkey:
+                            controller.release(pkey)
+                            time.sleep(0.02)
+                else:
+                    # Single key
+                    pkey = self._key_to_pynput(key)
                     if pkey:
                         controller.press(pkey)
-                        time.sleep(0.01)
-                
-                # Release in reverse order
-                for pkey in reversed(pynput_keys):
-                    if pkey:
+                        time.sleep(0.02)
                         controller.release(pkey)
-                        time.sleep(0.01)
-            else:
-                # Single key
-                pkey = self._key_to_pynput(key)
-                if pkey:
-                    controller.press(pkey)
-                    time.sleep(0.01)
-                    controller.release(pkey)
+                    else:
+                        print(f"⚠️ Warning: Could not map key '{key}' for {self.system}")
+        except Exception as e:
+            print(f"❌ Keyboard error pressing '{key}': {e}")
+            import traceback
+            traceback.print_exc()
     
     def write(self, text: str):
         """
-        Type text string.
+        Type text string with error handling for Mac stability.
         
         Args:
             text: Text to type
         """
-        if self._backend == "keyboard":
-            self._keyboard.write(text)
-        else:
-            controller = self._pynput.Controller()
-            controller.type(text)
+        try:
+            if self._backend == "keyboard":
+                self._keyboard.write(text)
+            else:
+                controller = self._pynput.Controller()
+                controller.type(text)
+        except Exception as e:
+            print(f"❌ Keyboard error writing '{text}': {e}")
+            import traceback
+            traceback.print_exc()
 
 
 class SystemAdapter:

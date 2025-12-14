@@ -468,6 +468,42 @@ class FishingBot:
         self._right_click_at(fishing_coords)
         time.sleep(self.app.purchase_click_delay)
         
+        # CRITICAL: Re-equip fishing rod after purchase (prevents crashes)
+        if not self.app.main_loop_active:
+            return
+            
+        import platform
+        is_mac = platform.system() == "Darwin"
+        
+        self.app.set_recovery_state("purchase_cleanup", {"action": "equipping_rod"})
+        print("🎣 Re-equipping fishing rod after purchase...")
+        
+        # Get rod key from settings
+        rod_key = getattr(self.app, 'rod_key', '1')
+        
+        # Add extra delay on Mac for keyboard input stability
+        if is_mac:
+            time.sleep(0.8)
+            print(f"🍎 Mac: Using extended delays for rod equip")
+        else:
+            time.sleep(0.3)
+        
+        # Press rod key to equip
+        print(f"🎣 Pressing rod key '{rod_key}'")
+        platform_keyboard.press_and_release(rod_key)
+        
+        # Wait for rod to equip (longer on Mac)
+        time.sleep(1.0 if is_mac else 0.5)
+        
+        # Select bait if auto-bait is enabled
+        if hasattr(self.app, 'bait_manager') and self.app.bait_manager.is_enabled():
+            print("🎣 Selecting bait after purchase...")
+            try:
+                self.app.bait_manager.select_top_bait()
+                time.sleep(0.3)
+            except Exception as e:
+                print(f"⚠️ Bait selection failed: {e}")
+        
         if hasattr(self.app, 'webhook_manager'):
             self.app.webhook_manager.send_purchase(amount)
         
