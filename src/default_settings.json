@@ -9,17 +9,21 @@
   },
   "fruit_coords": {
     "fruit_point": [
-      1273,
-      1149
+      1282,
+      1160
+    ],
+    "fruit_point_2": [
+      1280,
+      1161
     ],
     "bait_point": [
-      1289,
-      1067
+      1285,
+      1080
     ]
   },
   "fishing_location": [
-    1030,
-    664
+    951,
+    586
   ],
   "fruit_storage_enabled": true,
   "fruit_storage_key": "2",
@@ -31,7 +35,7 @@
   "smart_check_interval": 15.0,
   "webhook_url": "",
   "webhook_enabled": true,
-  "webhook_interval": 100,
+  "webhook_interval": 50,
   "fish_progress_webhook_enabled": true,
   "devil_fruit_webhook_enabled": true,
   "fruit_spawn_webhook_enabled": true,
@@ -41,13 +45,13 @@
   "ocr_performance_mode": "fast",
   "auto_bait_enabled": true,
   "top_bait_coords": [
-    1280,
-    1070
+    1347,
+    1071
   ],
   "window_width": 420,
   "window_height": 650,
   "dark_theme": true,
-  "current_theme": "ocean",
+  "current_theme": "christmas",
   "layout_settings": {
     "bar": {
       "name": "BAR LAYOUT",
@@ -62,10 +66,10 @@
         200
       ],
       "area": {
-        "x": 1316,
-        "y": 589,
-        "width": 256,
-        "height": 413
+        "x": 1335,
+        "y": 602,
+        "width": 233,
+        "height": 397
       },
       "description": "Fishing Bar Detection"
     },
@@ -82,10 +86,10 @@
         0
       ],
       "area": {
-        "x": 881,
-        "y": -1,
-        "width": 860,
-        "height": 353
+        "x": 856,
+        "y": -3,
+        "width": 904,
+        "height": 317
       },
       "description": "Loot Drop Recognition"
     }
@@ -98,5 +102,5 @@
     "sequence_delay": 0.5,
     "zoom_cooldown": 2.0
   },
-  "last_saved": "2025-12-14T13:23:16.574384"
+  "last_saved": "2025-12-27T01:25:04.384417"
 }

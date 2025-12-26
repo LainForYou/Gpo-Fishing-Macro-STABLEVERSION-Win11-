@@ -1,8 +1,8 @@
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-7289da?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/unPZxXAtfb)
 
-# 🎣 GPO Autofish win 11
+# 🎣 GPO Autofish - GUIDE
 
-**💬 Join ARIEL Discord server:** https://discord.gg/unPZxXAtfb
+**💬 Join our Discord server:** https://discord.gg/unPZxXAtfb
 
 ## What is this?
 
@@ -14,6 +14,8 @@ This is the **open-source version** of the GPO fishing macro that everyone uses.
 - ✅ **Community-driven** - Open for contributions and review
 
 The original closed-source macro is sketchy and often flagged by antivirus software because you can't verify what it's actually doing. This open-source version solves that problem.
+
+**🛡️ Concerned about safety? Read [IS_IT_A_VIRUS.md](IS_IT_A_VIRUS.md) for more information.**
 
 ---
 
@@ -71,86 +73,47 @@ The original closed-source macro is sketchy and often flagged by antivirus softw
 - ✅ **Recommended**: Python 3.13.0 (most stable)
 - ✅ **Alternative**: Python 3.12.7
 
-### 🪟 Windows Installation
-
-**Download Python:**
+**Download Links:**
 
 - [Python 3.13.0](https://www.python.org/ftp/python/3.13.0/python-3.13.0-amd64.exe) (Recommended)
 - [Python 3.12.7](https://www.python.org/ftp/python/3.12.7/python-3.12.7-amd64.exe) (Alternative)
 
-**Easy Installation:**
+### 🚀 Easy Installation (Recommended)
 
 1. **Install Python 3.12 or 3.13** (see links above) - Make sure to check "Add Python to PATH"
 2. **Download the repository** as ZIP and extract it
-3. **Double-click `installers\windows\install.bat`** - This will:
+3. **Double-click `install.bat`** - This will:
    - Check if Python is installed and verify version compatibility
    - Install all required packages automatically
    - Set everything up for you
 4. **Run the application:**
-   - **Standard mode:** Double-click `installers\windows\run.bat` (silent, no console)
-   - **Dev mode:** Double-click `installers\windows\run_dev.bat` (with console for debugging)
+   - **Standard mode:** Double-click `run.bat` (silent, no console)
+   - **Dev mode:** Double-click `run_dev.bat` (with console for debugging)
 
-**Easy Installation:**
+### 🔧 Manual Installation
 
-1. **Download the repository** and extract it
-2. **Open Terminal** and navigate to the folder:
-   ```bash
-   cd path/to/gpo-fishing
-   ```
-3. **Make scripts executable:**
-   ```bash
-   chmod +x installers/mac/install.sh
-   chmod +x installers/mac/run.sh
-   chmod +x installers/mac/run_dev.sh
-   ```
-4. **Run installation:**
-   ```bash
-   ./installers/mac/install.sh
-   ```
-5. **Run the application:**
-   - **Standard mode:** `./installers/mac/run.sh`
-   - **Dev mode:** `./installers/mac/run_dev.sh`
-
-**Important Notes for macOS:**
-
-- You may need to grant **Accessibility permissions** for keyboard/mouse control
-- Go to: System Preferences → Security & Privacy → Privacy → Accessibility
-- Add Terminal or Python to the allowed apps list
-- **F1-F4 hotkeys are fully supported** - No admin privileges required!
-
-### 🔧 Manual Installation (All Platforms)
-
-1. **Install Python 3.12 or 3.13**
-
-   - Windows: Download from links above
-   - macOS: `brew install python@3.12`
-   - Linux: Use your package manager
-
+1. **Install Python 3.12 or 3.13** from the links above (check "Add to PATH")
+   - ⚠️ **Do NOT use Python 3.14+** - it will cause installation failures
 2. **Clone or download this repository**
-
    ```bash
    git clone https://github.com/arielldev/gpo-autofish.git
    cd gpo-autofish
    ```
-
-3. **Install platform-specific requirements**
-
+3. **Install packages**
    ```bash
-   # Windows
-   pip install -r requirements-windows.txt
-
+   pip install -r requirements.txt
+   ```
 4. **Run the application**
-
    ```bash
-   # Windows
    python src/main.py
+   ```
 
 ## 🎮 Quick Start Guide
 
 ### First Time Setup
 
-1. **Install**: Navigate to `installers/<your-platform>/` and run the install script
-2. **Launch**: Use `run.bat` / `run.sh` (silent mode) or `run_dev.bat` / `run_dev.sh` (with console for debugging)
+1. **Install**: Run `install.bat` to set everything up automatically
+2. **Launch**: Use `run.bat` (silent mode) or `run_dev.bat` (with console for debugging)
 3. **Configure Layouts**: Position overlays over fishing bar and drop detection areas
 4. **Set Points**: Configure fruit storage points and auto-purchase coordinates
 5. **Enable Features**: Turn on devil fruit storage, webhooks, and auto-purchase as needed
@@ -184,8 +147,8 @@ The original closed-source macro is sketchy and often flagged by antivirus softw
 
 ### Performance Tips
 
-- **Long Sessions**: Use `run.bat` / `run.sh` for extended fishing sessions (runs silently in background)
-- **Debugging**: Use `run_dev.bat` / `run_dev.sh` when you need to see console output or troubleshoot issues
+- **Long Sessions**: Use `run.bat` for extended fishing sessions (runs silently in background)
+- **Debugging**: Use `run_dev.bat` when you need to see console output or troubleshoot issues
 - **Webhook Monitoring**: Use Discord alerts for fruit spawns and catches instead of watching console
 - **OCR Optimization**: Ensure good lighting and clear text for better fruit detection
 - **Spawn Detection**: The bot detects all 33 GPO devil fruits automatically using fuzzy matching
@@ -204,14 +167,12 @@ The original closed-source macro is sketchy and often flagged by antivirus softw
 
 ### Runtime Issues
 
-- **Hotkeys not working**:
-  - Note: F1-F4 keys work without admin/sudo privileges on all platforms!
-  - If hotkeys still don't work, try rebinding them using the "Rebind" buttons in the UI
+- **Hotkeys not working**: Try running with administrator privileges
 - **Fish detection failing**: Adjust overlay position over the blue fishing bar
 - **Devil fruit not detected**: Check OCR setup and drop area positioning
 - **Fruit spawns not detected**: Ensure drop layout covers the spawn message area
 - **Auto-purchase failing**: Verify all 4 purchase points are set correctly
-- **High CPU usage**: Use `run.bat` / `run.sh` for silent mode operation
+- **High CPU usage**: Use `run.bat` for silent mode operation
 
 ### Devil Fruit Issues
 
@@ -222,9 +183,9 @@ The original closed-source macro is sketchy and often flagged by antivirus softw
 
 ### Performance Issues
 
-- **Long sessions lagging**: Use `run.bat` / `run.sh` for silent background operation
-- **Need console output**: Use `run_dev.bat` / `run_dev.sh` for debugging mode with full logging
-- **Memory usage**: Standard mode automatically reduces memory footprint
+- **Long sessions lagging**: Use `run.bat` for silent background operation
+- **Need console output**: Use `run_dev.bat` for debugging mode with full logging
+- **Memory usage**: Standard mode (`run.bat`) automatically reduces memory footprint
 - **OCR slow**: Install EasyOCR properly for faster text recognition
 - **Spawn detection**: Works automatically for all 33 GPO fruits with fuzzy name matching
 
@@ -236,7 +197,7 @@ The codebase has been refactored into a clean, modular structure:
 
 ```
 src/
-├── main.py              # Application entry point
+├── main.py              # Application entry poi
 ├── gui.py               # Main GUI and UI components
 ├── fishing.py           # Fishing bot logic and devil fruit detection
 ├── overlay.py           # Overlay window management
@@ -247,8 +208,6 @@ src/
 ├── updater.py           # Auto-update system
 ├── settings.py          # Settings management
 ├── themes.py            # Theme system for UI customization
-├── platform_adapter.py  # Cross-platform mouse/system abstraction
-├── bait_manager.py      # Bait purchasing and inventory management
 └── utils.py             # Utility classes
 ```
 

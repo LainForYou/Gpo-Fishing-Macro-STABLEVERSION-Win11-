@@ -14,6 +14,8 @@ class FishingBot:
         self.watchdog_thread = None
         self.last_loop_heartbeat = time.time()
         self.force_stop_flag = False
+        self.last_fruit_spawn_time = 0  # Track when last fruit spawn was detected
+        self.fruit_spawn_cooldown = 15 * 60  # 15 minutes cooldown after detecting spawn
     
     def check_recovery_needed(self):
         """Smart recovery check - detects genuinely stuck states"""
@@ -256,7 +258,7 @@ class FishingBot:
         self.app.cast_line()
     
     def store_fruit(self):
-        """Complete fruit storage and rod switching workflow with reliable delays"""
+        """Complete fruit storage and rod switching workflow with reliable delays - stores 2 fruits"""
         fruit_storage_enabled = getattr(self.app, 'fruit_storage_enabled', False)
         print(f"🔍 Fruit storage enabled: {fruit_storage_enabled}")
         
@@ -269,62 +271,116 @@ class FishingBot:
             import time
             
             # Get configured keys from GUI settings
-            fruit_key = getattr(self.app, 'fruit_storage_key', '3')
+            fruit_key_1 = getattr(self.app, 'fruit_storage_key', '2')
+            fruit_key_2 = getattr(self.app, 'fruit_storage_key_2', '3')
             rod_key = getattr(self.app, 'rod_key', '1')
             
-            print(f"🍎 Starting fruit storage workflow with enhanced delays...")
+            print(f"🍎 Starting fruit storage workflow for 2 fruits...")
             
-            # Step 1: Press the configured fruit storage key
-            print(f"📦 Step 1: Pressing fruit storage key '{fruit_key}'")
-            keyboard.press_and_release(fruit_key)
+            # ===== FIRST FRUIT STORAGE SEQUENCE =====
+            # Step 1: Press the first fruit storage key
+            print(f"📦 Step 1: Pressing fruit storage key 1 '{fruit_key_1}'")
+            keyboard.press_and_release(fruit_key_1)
             time.sleep(0.5)  # Increased delay for inventory to fully open
             
-            # Step 2: Click at the configured fruit point
+            # Step 2: Click at the configured fruit point 1
             if hasattr(self.app, 'fruit_coords') and 'fruit_point' in self.app.fruit_coords:
                 fruit_x, fruit_y = self.app.fruit_coords['fruit_point']
-                print(f"🎯 Step 2: Clicking fruit point at ({fruit_x}, {fruit_y})")
+                print(f"🎯 Step 2: Clicking fruit point 1 at ({fruit_x}, {fruit_y})")
                 self.app._click_at((fruit_x, fruit_y))
-                time.sleep(0.3)  # Increased delay before storage action
+                time.sleep(0.5)  # Wait for fruit selection UI
             else:
                 print("❌ Fruit point coordinates not configured - skipping fruit storage")
                 return
             
-            # Step 2.5: Try to store fruit and wait
-            print(f"📦 Step 2.5: Attempting fruit storage...")
-            time.sleep(1.2)  # Increased wait for storage attempt to fully process
+            # Step 3: Click at fruit point 2 if configured (backup/alternative click)
+            if hasattr(self.app, 'fruit_coords') and 'fruit_point_2' in self.app.fruit_coords:
+                fruit_x2, fruit_y2 = self.app.fruit_coords['fruit_point_2']
+                print(f"🎯 Step 3: Clicking fruit point 2 (backup) at ({fruit_x2}, {fruit_y2})")
+                self.app._click_at((fruit_x2, fruit_y2))
+                time.sleep(0.5)  # Wait for alternative click to register
+                
+                # Step 4: Click back at fruit point 1
+                print(f"🎯 Step 4: Clicking back at fruit point 1 at ({fruit_x}, {fruit_y})")
+                self.app._click_at((fruit_x, fruit_y))
+                time.sleep(0.5)  # Wait for click to register
+            else:
+                print("ℹ️ Fruit point 2 not configured - skipping backup clicks")
             
-            # Step 2.6: Drop fruit with backspace (fallback)
-            print(f"⬇️ Step 2.6: Dropping fruit with backspace...")
-            keyboard.press_and_release('backspace')
-            time.sleep(1.0)  # Increased wait for drop animation to complete
+            # Step 5: Wait for storage dialog to appear
+            print(f"📦 Step 5: Waiting for storage dialog...")
+            time.sleep(0.8)  # Allow time for storage UI to fully load
             
-            # Step 3: Ensure proper rod equipping (single press only)
-            print(f"🎣 Step 3: Returning to rod...")
+            # Step 6: Drop fruit with backspace
+            print(f"⬇️ Step 6: Pressing backspace to drop/store first fruit...")
+            time.sleep(0.3)  # Brief pause before key press
+            keyboard.press('backspace')
+            time.sleep(0.1)  # Hold briefly
+            keyboard.release('backspace')
+            time.sleep(1.2)  # Wait for drop animation and dialog to close
+            
+            # ===== SECOND FRUIT STORAGE SEQUENCE =====
+            # Step 7: Press the second fruit storage key
+            print(f"📦 Step 7: Pressing fruit storage key 2 '{fruit_key_2}'")
+            keyboard.press_and_release(fruit_key_2)
+            time.sleep(0.5)  # Delay for inventory to open
+            
+            # Step 8: Click at the configured fruit point 1
+            print(f"🎯 Step 8: Clicking fruit point 1 at ({fruit_x}, {fruit_y})")
+            self.app._click_at((fruit_x, fruit_y))
+            time.sleep(0.5)  # Wait for fruit selection UI
+            
+            # Step 9: Click at fruit point 2 if configured
+            if hasattr(self.app, 'fruit_coords') and 'fruit_point_2' in self.app.fruit_coords:
+                print(f"🎯 Step 9: Clicking fruit point 2 (backup) at ({fruit_x2}, {fruit_y2})")
+                self.app._click_at((fruit_x2, fruit_y2))
+                time.sleep(0.5)  # Wait for alternative click to register
+                
+                # Step 10: Click back at fruit point 1
+                print(f"🎯 Step 10: Clicking back at fruit point 1 at ({fruit_x}, {fruit_y})")
+                self.app._click_at((fruit_x, fruit_y))
+                time.sleep(0.5)  # Wait for click to register
+            
+            # Step 11: Wait for storage dialog
+            print(f"📦 Step 11: Waiting for storage dialog...")
+            time.sleep(0.8)  # Allow time for storage UI to fully load
+            
+            # Step 12: Drop second fruit with backspace
+            print(f"⬇️ Step 12: Pressing backspace to drop/store second fruit...")
+            time.sleep(0.3)  # Brief pause before key press
+            keyboard.press('backspace')
+            time.sleep(0.1)  # Hold briefly
+            keyboard.release('backspace')
+            time.sleep(1.2)  # Wait for drop animation and dialog to close
+            
+            # ===== RETURN TO ROD =====
+            # Step 13: Return to rod
+            print(f"🎣 Step 13: Returning to rod...")
             
             # Wait longer for game to settle completely
             time.sleep(1.0)  # Extended wait to ensure game state is stable
             
             # Single rod key press - pressing twice cycles through items!
-            print(f"🎣 Step 3: Pressing rod key '{rod_key}' once")
+            print(f"🎣 Step 13: Pressing rod key '{rod_key}' once")
             keyboard.press_and_release(rod_key)
             time.sleep(0.8)  # Extended wait for rod to be fully equipped
             
-            # Step 4: Click at the configured bait point
+            # Step 14: Click at the configured bait point
             if hasattr(self.app, 'fruit_coords') and 'bait_point' in self.app.fruit_coords:
                 bait_x, bait_y = self.app.fruit_coords['bait_point']
-                print(f"🎯 Step 4: Clicking bait point at ({bait_x}, {bait_y})")
+                print(f"🎯 Step 14: Clicking bait point at ({bait_x}, {bait_y})")
                 self.app._click_at((bait_x, bait_y))
                 time.sleep(0.3)  # Increased delay after bait selection
             else:
                 print("❌ Bait point coordinates not configured - skipping bait selection")
                 return
             
-            # Step 5: Final wait and move to fishing position
-            print(f"🎯 Step 5: Final preparation for next cast...")
+            # Step 15: Final wait and move to fishing position
+            print(f"🎯 Step 15: Final preparation for next cast...")
             time.sleep(0.3)  # Final settling delay
             self.move_to_fishing_position()
             
-            print(f"✅ Fruit storage sequence completed with enhanced timing: Key {fruit_key} → Fruit Point → Storage/Drop → Rod Key x2 → Bait Point → Fishing Position")
+            print(f"✅ Fruit storage sequence completed: Fruit Key 1 → Sequence → Fruit Key 2 → Sequence → Rod Key → Bait Point → Fishing Position")
             
         except Exception as e:
             print(f"❌ Fruit storage workflow failed: {e}")
@@ -396,7 +452,9 @@ class FishingBot:
         
         # Purchase sequence with state tracking
         self.app.set_recovery_state("menu_opening", {"action": "pressing_e_key"})
-        keyboard.press_and_release('e')
+        keyboard.press('e')
+        time.sleep(3.0)
+        keyboard.release('e')
         time.sleep(self.app.purchase_delay_after_key)
         
         if not self.app.main_loop_active:
@@ -665,9 +723,50 @@ class FishingBot:
                         print('Scanning for blue fishing bar...')
                         
                         detection_start_time = time.time()
+                        last_spawn_check = time.time()
+                        spawn_check_interval = 4.0  # Check for spawns every 4 seconds (lightweight)
+                        
                         while self.app.main_loop_active and not self.force_stop_flag:
                             # Update heartbeat frequently during detection
                             self.update_heartbeat()
+                            
+                            # Periodically check for fruit spawns (with smart cooldown)
+                            # ONLY check when NOT actively fishing (detected == False means waiting for bite)
+                            current_time = time.time()
+                            time_since_last_spawn = current_time - self.last_fruit_spawn_time
+                            
+                            # Only check if: NOT actively fishing AND enough time passed AND outside cooldown
+                            if not detected and current_time - last_spawn_check > spawn_check_interval and time_since_last_spawn > self.fruit_spawn_cooldown:
+                                try:
+                                    # Check for spawn text using OCR
+                                    if hasattr(self.app, 'ocr_manager') and self.app.ocr_manager.is_available():
+                                        # Temporarily disable OCR cooldown for spawn checks
+                                        original_cooldown = self.app.ocr_manager.capture_cooldown
+                                        self.app.ocr_manager.capture_cooldown = 0.1  # Very short cooldown for spawn detection
+                                        
+                                        spawn_text = self.app.ocr_manager.extract_text()
+                                        
+                                        # Restore original cooldown
+                                        self.app.ocr_manager.capture_cooldown = original_cooldown
+                                        
+                                        if spawn_text:
+                                            print(f"🔍 Spawn check OCR result: {spawn_text}")
+                                            fruit_name = self.app.ocr_manager.detect_fruit_spawn(spawn_text)
+                                            if fruit_name:
+                                                print(f"🌟 Devil fruit spawn detected: {fruit_name}")
+                                                # Record detection time for cooldown
+                                                self.last_fruit_spawn_time = current_time
+                                                print(f"⏰ Fruit spawn cooldown activated - won't check again for 15 minutes")
+                                                # Send webhook
+                                                if hasattr(self.app, 'webhook_manager') and getattr(self.app, 'fruit_spawn_webhook_enabled', True):
+                                                    self.app.webhook_manager.send_fruit_spawn(fruit_name)
+                                    
+                                    last_spawn_check = current_time
+                                except Exception as spawn_error:
+                                    print(f"⚠️ Spawn check error: {spawn_error}")
+                            elif time_since_last_spawn <= self.fruit_spawn_cooldown:
+                                # Still in cooldown period, skip checking
+                                pass
                             
                             # Smart adaptive timeout system
                             current_time = time.time()

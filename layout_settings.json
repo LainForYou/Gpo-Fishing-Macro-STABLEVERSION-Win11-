@@ -1,17 +1,17 @@
 {
-  "current_layout": "bar",
+  "current_layout": "drop",
   "layout_areas": {
     "bar": {
-      "x": 1316,
-      "y": 589,
-      "width": 256,
-      "height": 413
+      "x": 1000,
+      "y": 371,
+      "width": 263,
+      "height": 472
     },
     "drop": {
-      "x": 881,
-      "y": -1,
-      "width": 860,
-      "height": 353
+      "x": 705,
+      "y": 76,
+      "width": 497,
+      "height": 122
     }
   }
 }
